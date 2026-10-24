@@ -1,0 +1,3 @@
+.godot/
+# Byggen skapas med export (se README); webbversionen läggs på gh-pages-grenen.
+build/

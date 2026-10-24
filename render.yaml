@@ -1,0 +1,12 @@
+# Render Blueprint för Chicago-servern (gratisnivå). Se README, avsnittet "Lägga upp onlinespelet".
+services:
+  - type: web
+    name: chicago-server
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "10000"
