@@ -5,7 +5,7 @@ extends RefCounted
 ## Lokal server (för utveckling och tester): starta med  Godot --headless --path . -- --server --port=9080
 const SERVER_LOKAL := "ws://localhost:9080"
 ## Produktionsservern (Render). Ändra till adressen Render ger tjänsten, med wss:// framför.
-const SERVER_PRODUKTION := "wss://chicago-server.onrender.com"
+const SERVER_PRODUKTION := "wss://chicagospel.onrender.com"
 ## Webbadressen där webbspelet ligger (t.ex. GitHub Pages). Används för länken som datorversionen kopierar.
 ## På webben används sidans egen adress automatiskt.
 const WEBB_ADRESS := ""

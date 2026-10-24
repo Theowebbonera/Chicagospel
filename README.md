@@ -67,7 +67,7 @@ Servern (`scripts/server.gd`) är auktoritativ med `motor.gd` som enda sanning. 
 
 **Serveradress:** den sätts i `scripts/natverk.gd`.
 - `SERVER_LOKAL` (`ws://localhost:9080`) används när spelet körs från editorn och när webbsidan körs över http, till exempel lokalt.
-- `SERVER_PRODUKTION` (`wss://chicago-server.onrender.com`) används när webbsidan körs över https och i den exporterade `.exe`-filen. **Ändra den till din Render-adress innan du exporterar.**
+- `SERVER_PRODUKTION` (`wss://chicagospel.onrender.com`) används när webbsidan körs över https och i den exporterade `.exe`-filen.
 - På webben kan adressen också ges med `?server=wss://...` i länken. I datorversionen går det med `-- --server-url=...`.
 - `WEBB_ADRESS` är adressen till webbspelet, och den används för länken som datorversionen kopierar. På webben används sidans egen adress.
 
