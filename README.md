@@ -12,11 +12,11 @@ Allt går att ändra under **Nytt parti** eller **Skapa bord online**. Knappen *
 
 | Regel | Standard |
 |---|---|
-| Målpoäng | 52 (avgörs när rundans poäng redovisas) |
+| Målpoäng och vinst | 52, **och man måste ha tagit Chicago för att vinna** (inställning, på; av i klassiska regler). Når man 52 utan Chicago fortsätter partiet: poängen räknas vidare, köpstoppet gäller och man kan fortfarande ropa Chicago. Vinsten kontrolleras varje gång poäng läggs till, både vid givens hand och efter sticket. Uppfyller flera villkoren vinner högst total, och vid lika vinner den som är först i tur efter given. En lyckad Chicago som tar spelaren över 52 vinner. Poängtavlan visar "behöver Chicago" för den som har nått målet utan Chicago. Kravet gäller bara när Chicago får ropas, och royal straight flush (om "vinner direkt" är på) vinner oavsett. |
 | Poängtabell | par 1, två par 2, triss 3, stege 4, färg 5, kåk 6, **fyrtal 8**, **färgstege 10**, royal straight flush 52 |
 | Fyrtal | **nollställer alla andra spelares totalpoäng** (inställning, på) |
 | När händerna poängsätts | **givens hand** (de utdelade korten innan något byte) och **handen man spelade sticket med**, efter sticket. Inga poäng efter bytena. Den äldre varianten med poäng efter varje byte finns kvar som inställning. |
-| Visning | rundans poäng (givens hand, sluthand, stick, Chicago) **visas och läggs till totalen först när sticket är klart** |
+| Visning | **givens hand visas och läggs till direkt** (före bytena), liksom poäng efter byten om den inställningen är på. Ett fyrtal vid given nollställer de andra direkt i poängtavlan. **Bara stick-rundan** (sluthandens poäng, sista sticket eller tvåan, Chicago +15 eller −15) visas och läggs till när sticket är klart. |
 | Bara bästa handen | bara den bästa handen vid bordet får poäng, och högt kort ger inget. Vid exakt lika får den som är först i tur efter given poängen. |
 | Köpstopp | den som har **41 poäng eller mer** får inte byta och står över bytena (inställbart) |
 | Byten | 3 omgångar, 0–5 kort |
@@ -24,7 +24,7 @@ Allt går att ändra under **Nytt parti** eller **Skapa bord online**. Knappen *
 | Chicago | får bara ropas med **minst 15 poäng**. Lyckas det ger det **+15**, och inga stickpoäng eller handpoäng efter sticket delas ut. Spricker det blir det **−15**, men spelarens stick- och handpoäng efter sticket räknas ändå. Theos exempel: −15 + sista sticket 2 + par 1 = **−12**. Givens poäng räknas alltid. |
 | Chicago en gång per parti | den som har **lyckats** får inte ropa igen, inte ens efter att ha blivit nollställd av ett fyrtal. En misslyckad Chicago förbrukar inte rätten. Den som har tagit sin Chicago märks med "Chicago tagen" i poängtavlan. |
 
-**Avgörande om totalen:** köpstoppet (41), kravet för Chicago (15) och fyrtalets nollställning räknas på en **löpande intern total**. Den innehåller poängen från givens hand i den pågående rundan. Det var Theos svar. Den som når 41 genom givens poäng får alltså inte byta i samma runda, och den som når 15 vid given får ropa Chicago. Ett fyrtal vid given nollställer de andra direkt, vilket påverkar deras köpstopp och Chicago-rätt. Skärmen följer ändå regeln att poängen visas efter sticket.
+**Köpstopp och Chicago-rätt** följer den synliga totalen. Givens poäng finns redan med i den, eftersom de visas direkt. Den som når 41 genom givens poäng får alltså inte byta i samma runda, och den som når 15 vid given får ropa Chicago. Ett fyrtal vid given nollställer de andra direkt.
 
 **Eget val:** färgstege har 10 poäng som standard, så att den är värd mer än fyrtalet (8). Det är också värdet i Theos första poängtabell.
 
@@ -57,13 +57,19 @@ Allt går att ändra under **Nytt parti** eller **Skapa bord online**. Knappen *
 - **6-7:** figuren håller båda handflatorna uppåt och gungar händerna i otakt med en pratbubbla och ett syntetiserat ljud. Inget av detta påverkar spelet eller visar kort.
 
 ## Spela online
-1. **Skapa bord online …**: skriv ditt namn, välj antal platser, regler och figur, och tryck **Skapa bord**. Du får en kod (till exempel `K7Q2`) och en lobby.
-2. **Kopiera länk** och skicka den. Kompisarna öppnar `https://<din-sida>/?bord=K7Q2`, och spelet går direkt till "Gå med" med koden ifylld. De kan också välja **Gå med i bord …** och skriva koden.
-3. I lobbyn syns platserna, figurerna och partiets regler. Värden kan lägga robotar (lätt, medel eller svår) på tomma platser eller trycka **Fyll tomma platser med robotar**, och sedan **Starta**.
+1. **Värden** väljer **Skapa bord online …**, skriver sitt namn och väljer antal platser, regler och figur, och trycker **Skapa bord**. Värden får en kod (till exempel `K7Q2`) och en lobby. Bara värden ställer in regler, antal platser och robotar, och bara värden ser och kan trycka **Starta**.
+2. **Kopiera länk** och skicka den. Kompisarna öppnar `https://<din-sida>/?bord=K7Q2`. Efter "Klicka för att börja" kommer de direkt till en enkel skärm med:
+   - figurväljaren (snurrande förhandsvisning, Föregående och Nästa). Figurer som redan är tagna vid bordet visas som upptagna och hoppas över.
+   - ett namnfält, förifyllt med figurens namn
+   - partiets regler i läsläge, till exempel "Mål 52 med Chicago · Köpstopp 41 · Chicago från 15"
+   - en stor knapp **Gå med**
+
+   Det finns inga regelinställningar och inga knappar för robotar eller start. **Gå med i bord …** i menyn ger samma skärm med ett fält för koden.
+3. I lobbyn syns alla platser, figurer och namn. Den som gått med ser "Väntar på att <värd> startar partiet …". Värden lägger robotar (lätt, medel eller svår) på tomma platser eller trycker **Fyll tomma platser med robotar**, och sedan **Starta**.
 4. Tappar någon anslutningen ansluter klienten själv igen med en token som är sparad lokalt (`user://chicago_online.cfg`). Samma länk fungerar också. Medan spelaren är borta gör en robot dragen efter 6 sekunder.
 5. Bord utan anslutna människor städas bort efter 10 minuter.
 
-Servern (`scripts/server.gd`) är auktoritativ med `motor.gd` som enda sanning. Den blandar, ger, avgör stick och poäng och låter robotar spela. Varje klient får bara sin egen hand och det offentliga. Andras kort skickas aldrig: i givar och byten kommer de som `-1` (`scripts/natverk.gd`, `filtrera`/`tillstand`). Klienten visar dem med anonyma kortnoder som byter identitet osynligt när ett kort spelas ut. Allt valideras på servern: otillåtna drag, drag i fel tur, för tidiga kast, start av någon annan än värden och att gå med i ett pågående parti utan token. Protokollet är JSON över WebSocket.
+Servern (`scripts/server.gd`) är auktoritativ med `motor.gd` som enda sanning. Den blandar, ger, avgör stick och poäng och låter robotar spela. Varje klient får bara sin egen hand och det offentliga. Andras kort skickas aldrig: i givar och byten kommer de som `-1` (`scripts/natverk.gd`, `filtrera`/`tillstand`). Klienten visar dem med anonyma kortnoder som byter identitet osynligt när ett kort spelas ut. Allt valideras på servern: otillåtna drag, drag i fel tur och för tidiga kast. Bara värdens anslutning, alltså värdens token, får ändra regler, lägga till eller ta bort robotar, fylla platser och starta. Två spelare får inte ha samma figur, och robotar får lediga figurer. Att gå med i ett pågående parti kräver token. Tappar värden anslutningen behålls värdskapet via token vid återanslutning. Före anslutning kan klienten fråga om ett bord (`bordinfo`) och får regler, värd och tagna figurer. Protokollet är JSON över WebSocket.
 
 **Serveradress:** den sätts i `scripts/natverk.gd`.
 - `SERVER_LOKAL` (`ws://localhost:9080`) används när spelet körs från editorn och när webbsidan körs över http, till exempel lokalt.
@@ -138,7 +144,7 @@ Du skapar kontona själv. Inget är uppladdat härifrån.
 
 ## Tester
 `testa.bat` kör alla sju sviterna headless.
-- `test_regler`, 416 kontroller:
+- `test_regler`, 435 kontroller:
   - handvärdering, bekänna färg, stick och tvåan
   - de klassiska reglerna
   - husreglerna:
@@ -150,14 +156,17 @@ Du skapar kontona själv. Inget är uppladdat härifrån.
     - Theos exempel (−12)
     - givens poäng räknas även när Chicago ropas
     - Chicago en gång per parti, även efter nollställning, och tillåtet igen efter misslyckad
+    - givens poäng visas direkt (före bytena) och bara stick-rundan efter sticket
+    - 52 utan Chicago ger ingen vinst, en Chicago som tar spelaren över 52 vinner, och den som tagit Chicago och sedan nollställts vinner vid 52. Utan regeln vinner 52 direkt, och högst total vinner när flera når målet.
     - robotar följer reglerna
   - sparfiler
   - att robotarna inte fuskar
-- `test_robotar`: 28 hela partier med 2–6 spelare och olika regler, plus nivåjämförelse.
+- `test_robotar`: 28 hela partier med 2–6 spelare och olika regler, plus nivåjämförelse. Säkerhetstaket är 1500 givar per parti. Med husregeln "Chicago krävs för vinst" blir partier med 5–6 spelare långa, upp till cirka 400 givar mellan robotar, men alla tar slut.
 - `test_figurer`: alla 14 figurer byggs och provas med alla reaktioner, kast och 6-7, och slumpade figurer blir unika.
-- `test_dolda_kort`: 3D-scenen, både mot robotar och med två människor på samma dator, med alla kast igång. Testet kontrollerar i varje bildruta att inga otillåtna kort syns.
+- `test_dolda_kort`: 3D-scenen, både mot robotar och med två människor på samma dator, med alla kast igång. Testet kontrollerar i varje bildruta att inga otillåtna kort syns, och att poängtavlan redan under bytena visar givens poäng.
 - `test_scen`: ett helt robotparti i 3D, där alla tio kast och hälsningar och den egna 6-7 provas.
 - `test_online`: en server och tre klienter.
+  - En klient frågar om bordet (`bordinfo`), en dubblerad figur avvisas, och en icke-värd avvisas vid robottillägg, regeländring, fyllning, start och byte till en tagen figur. Värden ändrar regler och startar efter att två har gått med.
   - De skapar ett bord, går med via kod och lägger till en robot.
   - Testet kontrollerar figurerna och att otillåtna drag, drag i fel tur, för tidiga kast, fel startare och att gå med i ett pågående parti avvisas.
   - Ett helt parti spelas, med frånkoppling och återkomst via token.

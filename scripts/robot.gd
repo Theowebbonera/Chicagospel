@@ -219,12 +219,16 @@ static func valj_chicago(vy: Dictionary, niva: int, rng: RandomNumberGenerator) 
 	for c in vy.hand:
 		if K.valor(c) >= 12:
 			hoga += 1
-	if hoga < 3:
+	# husregeln: den som har nått målet men saknar Chicago måste ta en Chicago för att vinna
+	var behover: bool = r.chicago_kravs_for_vinst and r.chicago_tillatet and vy.poang[vy.jag] >= r.malpoang and not vy.chicago_tagen[vy.jag]
+	if hoga < (2 if behover else 3):
 		return false
 	var antal: int = [30, 80, 200][niva]
 	var chans := chicago_chans(vy, antal, rng)
 	var ev: float = chans * r.chicago_poang - (1.0 - chans) * r.chicago_straff
 	var annars: float = float(r.stick_poang) / vy.n
+	if behover:
+		return chans > [0.6, 0.3, 0.22][niva]
 	match niva:
 		LATT:
 			return chans > 0.85

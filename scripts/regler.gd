@@ -23,7 +23,7 @@ var fyrtal_nollstaller := true  # fyrtal nollställer alla andras totalpoäng
 var poang_vid_given := 1  # 0 nej, 1 ja (givens hand innan något byte), 2 ja med dubbla poäng
 var poang_byten := 0  # 0 inga poäng efter bytena, 1 efter varje byte utom det sista, 2 efter varje byte
 var poang_efter_stick := true  # handen man spelade sticket med poängsätts efter sticket
-var visa_vid_rundslut := true  # rundans poäng visas och läggs till först när sticket är klart
+var visa_vid_rundslut := true  # stick-rundans poäng (sluthand, stick, Chicago) visas när sticket är klart
 var lika_regel := 0  # 0 den som är först i tur efter given, 1 ingen får poäng, 2 alla med lika hand får poäng
 var ess_lag := true
 var royal_vinner := false
@@ -44,6 +44,7 @@ var chicago_poang := 15
 var chicago_straff := 15
 var chicago_min := 15
 var chicago_en_gang := true  # den som lyckats med Chicago får inte ropa igen i partiet
+var chicago_kravs_for_vinst := true  # man måste ha tagit Chicago för att vinna
 var chicago_spelar_ut := true
 var chicago_avbryt := false
 
@@ -67,7 +68,7 @@ const LISTA := [
 	{"namn": "poang_vid_given", "text": "Givens hand (innan något byte)", "typ": "val", "val": ["Nej", "Ja", "Ja, dubbla poäng"], "hjalp": "De utdelade korten poängsätts innan första bytet. Räknas även om någon ropar Chicago."},
 	{"namn": "poang_efter_stick", "text": "Handen man spelade sticket med", "typ": "bool", "hjalp": "Händerna som de såg ut när sticken började poängsätts efter sticket. Lyckas någon med Chicago delas de poängen inte ut."},
 	{"namn": "poang_byten", "text": "Poäng efter bytena", "typ": "val", "val": ["Nej", "Efter varje byte utom det sista", "Efter varje byte"], "hjalp": "Äldre variant där händerna poängsätts direkt efter bytena."},
-	{"namn": "visa_vid_rundslut", "text": "Visa rundans poäng först efter sticket", "typ": "bool", "hjalp": "Poängen under rundan hålls hemliga och läggs till totalen när sticket är klart. Köpstopp och rätt att ropa Chicago räknas ändå på den löpande totalen."},
+	{"namn": "visa_vid_rundslut", "text": "Visa stick-rundans poäng efter sticket", "typ": "bool", "hjalp": "Givens hand visas direkt. Poäng för sluthanden, sista sticket, tvåan och Chicago visas och läggs till när sticket är klart."},
 	{"namn": "lika_regel", "text": "Vid lika händer", "typ": "val", "val": ["Först i tur efter given vinner", "Ingen får poäng", "Alla med lika hand får poäng"], "hjalp": "Händerna jämförs i hemlighet i turordning med början hos spelaren efter given. Inga kort visas."},
 	{"namn": "ess_lag", "text": "Ess kan vara lågt i stege (E-2-3-4-5)", "typ": "bool"},
 	{"grupp": "Byten"},
@@ -84,7 +85,8 @@ const LISTA := [
 	{"namn": "chicago_tillatet", "text": "Chicago får ropas", "typ": "bool"},
 	{"namn": "chicago_poang", "text": "Poäng för lyckad Chicago", "typ": "tal", "min": 0, "max": 200, "hjalp": "Lyckad Chicago ger bara dessa poäng: inga stickpoäng och ingen poäng för handen efter sticket."},
 	{"namn": "chicago_straff", "text": "Avdrag för misslyckad Chicago", "typ": "tal", "min": 0, "max": 200, "hjalp": "Stickpoäng och handpoäng efter sticket räknas ändå."},
-	{"namn": "chicago_min", "text": "Minsta poäng för att få ropa", "typ": "tal", "min": -100, "max": 500, "hjalp": "Räknas på den löpande totalen, alltså med poängen från givens hand."},
+	{"namn": "chicago_min", "text": "Minsta poäng för att få ropa", "typ": "tal", "min": -100, "max": 500, "hjalp": "Räknas på totalen, där givens poäng redan är med."},
+	{"namn": "chicago_kravs_for_vinst", "text": "Man måste ha tagit Chicago för att vinna", "typ": "bool", "hjalp": "Vinst kräver målpoängen och en lyckad Chicago någon gång i partiet (även om man blivit nollställd efteråt). Når man målet utan Chicago fortsätter partiet."},
 	{"namn": "chicago_en_gang", "text": "Chicago bara en gång per parti", "typ": "bool", "hjalp": "Den som har lyckats med Chicago får inte ropa igen, inte ens efter att ha blivit nollställd. En misslyckad Chicago förbrukar inte rätten."},
 	{"namn": "chicago_spelar_ut", "text": "Den som ropar spelar ut först", "typ": "bool"},
 	{"namn": "chicago_avbryt", "text": "Given avbryts när Chicago spricker", "typ": "bool", "hjalp": "Av (standard): sticken spelas klart."},
@@ -146,6 +148,7 @@ func klassiska() -> void:
 	kopstopp_pa = false
 	chicago_min = 0
 	chicago_en_gang = false
+	chicago_kravs_for_vinst = false
 	chicago_avbryt = true
 
 
@@ -173,10 +176,24 @@ func ladda(cf: ConfigFile) -> void:
 	fran_dict(d)
 
 
+## En rad med de viktigaste reglerna, för den som går med i ett bord (läsläge).
+func kort_sammanfattning() -> String:
+	var d: Array = ["Mål %d%s" % [malpoang, " med Chicago" if chicago_kravs_for_vinst else ""]]
+	if kopstopp_pa:
+		d.append("Köpstopp %d" % kopstopp)
+	if chicago_tillatet:
+		d.append("Chicago från %d" % chicago_min if chicago_min != 0 else "Chicago")
+	if fyrtal_nollstaller:
+		d.append("Fyrtal nollställer")
+	d.append("%d byten" % antal_byten)
+	d.append("Sista sticket %d, tvåa %d" % [stick_poang, tvaa_poang] if tvaa_bonus else "Sista sticket %d" % stick_poang)
+	return " · ".join(d)
+
+
 ## Kort sammanfattning av reglerna som de är inställda, för regelsidan i spelet.
 func beskrivning() -> String:
 	var t := ""
-	t += "[b]Mål:[/b] först till %d poäng. Bara poäng, inga insatser.\n\n" % malpoang
+	t += "[b]Mål:[/b] först till %d poäng%s. Bara poäng, inga insatser. Når flera målet samtidigt vinner den med högst total, vid lika den som är först i tur efter given.\n\n" % [malpoang, ", och man måste ha tagit Chicago någon gång i partiet för att vinna" if chicago_kravs_for_vinst else ""]
 	t += "[b]Given:[/b] alla får 5 kort. Spelaren efter given börjar och turen går medsols.\n\n"
 	var nar: Array = []
 	if poang_vid_given > 0:
@@ -189,7 +206,7 @@ func beskrivning() -> String:
 		nar.append("handen man spelade sticket med, efter sticket")
 	t += "[b]Poäng för pokerhänder:[/b] %s. Bara den bästa handen vid bordet får poäng, och högt kort ger inget." % (", ".join(nar) if not nar.is_empty() else "inga")
 	if visa_vid_rundslut:
-		t += " Rundans poäng hålls hemliga och visas och läggs till totalen först när sticket är klart."
+		t += " Givens hand räknas och visas direkt. Stick-rundans poäng (handen efter sticket, sista sticket och Chicago) visas när sticket är klart."
 	t += " Inga kort vänds: spelet säger bara vem som tar poängen och vilken sorts hand det är (till exempel \"Anna: färg, 5 poäng\")."
 	var lika: String = ["får den som är först i tur efter given poängen", "får ingen poäng", "får alla med lika hand poäng"][lika_regel]
 	t += " Vid exakt lika hand %s.\n" % lika
@@ -200,7 +217,7 @@ func beskrivning() -> String:
 	if antal_byten > 0:
 		t += "[b]Byten:[/b] %d bytesomgångar där man byter 0–%d kort." % [antal_byten, max_byte]
 		if kopstopp_pa:
-			t += " Köpstopp: den som har %d poäng eller mer (räknat med rundans poäng hittills) får inte byta utan står över." % kopstopp
+			t += " Köpstopp: den som har %d poäng eller mer får inte byta utan står över." % kopstopp
 		t += "\n\n"
 	else:
 		t += "[b]Byten:[/b] inga byten.\n\n"
@@ -211,7 +228,7 @@ func beskrivning() -> String:
 	if chicago_tillatet:
 		t += "[b]Chicago:[/b] före första sticket får en spelare ropa Chicago och lovar då att ta alla fem stick."
 		if chicago_min != 0:
-			t += " Man måste ha minst %d poäng (räknat med rundans poäng hittills) för att få ropa." % chicago_min
+			t += " Man måste ha minst %d poäng för att få ropa." % chicago_min
 		t += " Lyckas det ger det %d poäng och inget annat efter sticket: varken stickpoäng eller handpoäng delas ut. Spricker det dras %d poäng, men stick- och handpoäng efter sticket räknas ändå. Poängen för givens hand räknas alltid." % [chicago_poang, chicago_straff]
 		if chicago_en_gang:
 			t += " Den som har lyckats med Chicago får inte ropa igen i partiet, inte ens efter att ha blivit nollställd. En misslyckad Chicago förbrukar inte rätten."

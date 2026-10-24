@@ -87,6 +87,8 @@ func _ta_emot(id: int, text: String) -> void:
 			_ga_med(id, d)
 		"ping":
 			_skicka(id, {"t": "pong"})
+		"bordinfo":
+			_bordinfo(id, d)
 		_:
 			if a.bord == "" or not bord.has(a.bord):
 				_fel(id, "Du sitter inte vid något bord")
@@ -102,14 +104,25 @@ func _ta_emot(id: int, text: String) -> void:
 						return
 					for q in b.platser.size():
 						if b.platser[q].typ == "tom":
-							b.platser[q].typ = "robot"
-							b.platser[q].niva = 1
-							b.platser[q].namn = _robotnamn(b, q)
+							_gor_robot(b, q, 1)
 					_skicka_lobby(b)
 				"starta":
 					_starta_parti(id, b, p)
 				"figur":
-					b.platser[p].figur = _figur(d)
+					var f := _figur(d)
+					if f >= 0 and _figur_upptagen(b, f, p):
+						_fel(id, "Figuren är upptagen, välj en annan")
+						return
+					b.platser[p].figur = f
+					_skicka_lobby(b)
+				"regler":
+					# bara värden (värdens token) får ändra reglerna, och bara före start
+					if p != b.varde or b.startad:
+						_fel(id, "Bara värden kan ändra reglerna före start")
+						return
+					if d.get("regler") is Dictionary:
+						b.regler.fran_dict(d.regler)
+						b.regler.malpoang = clampi(b.regler.malpoang, 5, 500)
 					_skicka_lobby(b)
 				"byt", "chicago", "spela":
 					_drag(id, b, p, d)
@@ -203,12 +216,53 @@ func _ga_med(id: int, d: Dictionary) -> void:
 	if b.startad:
 		_fel(id, "Partiet vid bord %s har redan börjat" % kod)
 		return
+	var f := _figur(d)
+	if f >= 0 and _figur_upptagen(b, f, -1):
+		_fel(id, "Figuren %s är redan tagen vid bordet, välj en annan" % Figurer.namn(f))
+		return
 	for p in b.platser.size():
 		if b.platser[p].typ == "tom":
-			b.platser[p].figur = _figur(d)
+			b.platser[p].figur = f
 			_satt_ner(id, b, p, _rent_namn(d.get("namn", "")))
 			return
 	_fel(id, "Bordet %s är fullt" % kod)
+
+
+## Information om ett bord för den som funderar på att gå med: regler, värd, platser och tagna figurer.
+func _bordinfo(id: int, d: Dictionary) -> void:
+	var kod := str(d.get("kod", "")).to_upper().strip_edges()
+	if not bord.has(kod):
+		_skicka(id, {"t": "bordinfo", "kod": kod, "finns": false})
+		return
+	var b: Dictionary = bord[kod]
+	var l := _lobby(b)
+	l["t"] = "bordinfo"
+	l["finns"] = true
+	l["varde_namn"] = b.platser[b.varde].namn
+	_skicka(id, l)
+
+
+func _figur_upptagen(b: Dictionary, f: int, utom: int) -> bool:
+	for q in b.platser.size():
+		if q != utom and b.platser[q].typ != "tom" and b.platser[q].figur == f:
+			return true
+	return false
+
+
+## Robot på en plats, med en figur som ingen annan har.
+func _gor_robot(b: Dictionary, q: int, niva: int) -> void:
+	b.platser[q].typ = "robot"
+	b.platser[q].niva = clampi(niva, 0, 2)
+	var valda: Array = []
+	for i in b.platser.size():
+		var x: Dictionary = b.platser[i]
+		valda.append(x.figur if x.typ != "tom" and i != q else -1)
+	var f: int = b.platser[q].figur
+	if f < 0 or _figur_upptagen(b, f, q):
+		var fordelat := Figurer.fordela(valda, rng)
+		f = fordelat[q]
+	b.platser[q].figur = f
+	b.platser[q].namn = "%s (robot)" % Figurer.namn(f)
 
 
 func _figur(d: Dictionary) -> int:
@@ -231,12 +285,11 @@ func _andra_plats(id: int, b: Dictionary, p: int, d: Dictionary) -> void:
 		return
 	var typ := str(d.get("typ", "tom"))
 	if typ == "robot":
-		b.platser[q].typ = "robot"
-		b.platser[q].niva = clampi(int(d.get("niva", 1)), 0, 2)
-		b.platser[q].namn = _robotnamn(b, q)
+		_gor_robot(b, q, int(d.get("niva", 1)))
 	else:
 		b.platser[q].typ = "tom"
 		b.platser[q].namn = ""
+		b.platser[q].figur = -1
 	_skicka_lobby(b)
 
 

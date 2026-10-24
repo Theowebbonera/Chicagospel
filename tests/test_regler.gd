@@ -538,21 +538,23 @@ func _husregler() -> void:
 	# --- poäng vid given och efter sticket, visas först efter sticket
 	var m := _husmotor(["7C 9D JH KC 2S", "AS AD 9H 7H 3S"], [0, 0])  # förhand = 1 (par i ess)
 	var h: Array = m.ta_handelser()
-	_ok(not "poang" in _typer(h), "inga poäng visas vid given")
-	_ok(m.poang == [0, 0] and m.intern == [0, 1], "givens par räknas i den löpande totalen men visas inte: %s / %s" % [m.poang, m.intern])
-	_ok(m.vy(0).poang == [0, 0], "andra ser inte givens poäng")
+	var given := 0
+	for e in h:
+		if e.typ == "poang" and e.orsak == "hand" and e.nar == "given":
+			given += 1
+			_ok(e.text == "par" and e.spelare == 1 and e.tot == 1, "givens hand visas direkt: bara typen 'par'")
+	_ok(m.poang == [0, 1] and m.intern == [0, 1], "givens par läggs till totalen direkt: %s / %s" % [m.poang, m.intern])
+	_ok(m.vy(0).poang == [0, 1], "alla ser givens poäng direkt")
+	_ok(h.find_custom(func(e): return e.typ == "poang") < h.find_custom(func(e): return e.typ == "byte_start"), "givens poäng visas före bytena")
 	_spela_rundan(m)
 	h = m.ta_handelser()
 	var typer := _typer(h)
-	_ok("redovisning" in typer, "rundans poäng redovisas efter sticket")
-	var given := 0
+	_ok("redovisning" in typer, "stick-rundans poäng redovisas efter sticket")
 	var slut := 0
 	for e in h:
 		if e.typ == "poang" and e.orsak == "hand":
-			if e.nar == "given":
-				given += 1
-				_ok(e.text == "par" and e.spelare == 1, "givens hand: bara typen 'par'")
-			elif e.nar == "sluthand":
+			_ok(e.nar == "sluthand", "efter sticket redovisas bara stick-rundan")
+			if e.nar == "sluthand":
 				slut += 1
 	_ok(given == 1 and slut == 1, "poäng för givens hand och för handen efter sticket (%d, %d)" % [given, slut])
 	_ok(m.poang == m.intern and m.poang[1] >= 2, "visade poäng = löpande efter sticket: %s" % [m.poang])
@@ -561,7 +563,7 @@ func _husregler() -> void:
 	# --- fyrtal nollställer alla andra (vid given, direkt i den löpande totalen)
 	m = _husmotor(["7C 9D JH KC 2S", "9S 9D 9H 9C 3S", "4H 6D 8S 10C QD"], [10, 20, 30])  # förhand 1
 	_ok(m.intern == [0, 28, 0], "fyrtal vid given nollställer andra direkt: %s" % [m.intern])
-	_ok(m.poang == [10, 20, 30], "nollställningen syns inte förrän efter sticket")
+	_ok(m.poang == [0, 28, 0], "nollställningen syns direkt i poängtavlan: %s" % [m.poang])
 	_ok(not m.har_kopstopp(2), "nollställd spelare har inte längre köpstopp")
 	_spela_rundan(m)
 	h = m.ta_handelser()
@@ -645,6 +647,33 @@ func _husregler() -> void:
 	_ok(not m.far_ropa(0), "efter nollställning fortfarande spärrad (tagen)")
 	m.regler.chicago_en_gang = false
 	_ok(m.far_ropa(0), "med regeln avstängd får man ropa igen")
+
+	# --- man måste ha tagit Chicago för att vinna
+	m = _husmotor(["AS AD 9H 9C 3S", "7C 4D JH KC 2S"], [50, 0])  # förhand 1, spelare 0 får två par vid given
+	_ok(m.poang[0] == 52 and m.fas != Motor.Fas.SLUT and m.vinnare < 0, "52 utan Chicago ger ingen vinst: %s fas %d" % [m.poang, m.fas])
+	_ok(m.behover_chicago(0) and not m.far_vinna(0), "spelaren behöver Chicago")
+	_ok(m.har_kopstopp(0) and m.far_ropa(0), "köpstopp gäller och Chicago får ropas")
+	m = _husmotor(["AS AH AD AC KS", "2S 3H 4D 5C 7S"], [45, 0], func(r):
+		r.antal_byten = 0
+		r.poang_vid_given = 0)
+	m.ropa_chicago(0, true)
+	_spela_alla(m, ["AS 2S", "AH 3H", "AD 4D", "AC 5C", "KS 7S"])
+	_ok(m.fas == Motor.Fas.SLUT and m.vinnare == 0 and m.poang[0] == 60, "Chicago som tar spelaren över 52 vinner: %s" % [m.poang])
+	# tagen Chicago, nollställd, sedan 52 igen: vinner
+	r = Regler.new()
+	m = Motor.new()
+	m.starta(["A", "B"], r, 3, 0)
+	m.chicago_tagen = [true, false]
+	m.satt_poang([50, 0])
+	m.ny_giv(_lek_for(["AS AD 9H 9C 3S", "7C 4D JH KC 2S"], 0))  # första given: givare 0
+	_ok(m.fas == Motor.Fas.SLUT and m.vinnare == 0, "tagen Chicago (även efter nollställning) och 52 vinner direkt vid given: %s" % [m.poang])
+	r = Regler.new()
+	r.chicago_kravs_for_vinst = false
+	m = _husmotor(["AS AD 9H 9C 3S", "7C 4D JH KC 2S"], [50, 0], func(rr): rr.chicago_kravs_for_vinst = false)
+	_ok(m.fas == Motor.Fas.SLUT and m.vinnare == 0, "utan regeln vinner 52 direkt")
+	# flera uppfyller villkoren: högst total vinner
+	m = _husmotor(["AS AD 9H 9C 3S", "7C 4D JH KC 2S"], [50, 60], func(rr): rr.chicago_kravs_for_vinst = false)
+	_ok(m.vinnare == 1, "högst total vinner när flera når målet")
 
 	# --- robotarna följer reglerna
 	m = _husmotor(["7C 9D JH KC 2S", "AS AD 9H 7H 3S"], [10, 10], func(r): r.antal_byten = 0)

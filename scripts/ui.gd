@@ -17,7 +17,8 @@ signal paus_andrad(pausad: bool)
 signal kasta(mal: int, typ: String)
 signal egen_sexsju
 signal skapa_online(namn: String, antal: int, regler, visning: Dictionary)
-signal ga_med_online(kod: String, namn: String)
+signal ga_med_online(kod: String, namn: String, figur: int)
+signal fraga_bordinfo(kod: String)
 signal lobby_plats(plats: int, typ: String, niva: int)
 signal lobby_fyll
 signal lobby_starta
@@ -292,7 +293,7 @@ func _bygg_huvudmeny() -> void:
 	var mell := Control.new()
 	mell.custom_minimum_size = Vector2(0, 30)
 	v.add_child(mell)
-	var knappar := [["Snabbstart – du mot tre robotar", func() -> void: snabbstart.emit()], ["Nytt parti …", func() -> void: visa_installningar()], ["Skapa bord online …", func() -> void: visa_installningar_online()], ["Gå med i bord …", func() -> void: visa_ga_med("", get_parent().sparat_namn())], ["Regler", func() -> void: visa_regler(null)]]
+	var knappar := [["Snabbstart – du mot tre robotar", func() -> void: snabbstart.emit()], ["Nytt parti …", func() -> void: visa_installningar()], ["Skapa bord online …", func() -> void: visa_installningar_online()], ["Gå med i bord …", func() -> void: visa_ga_med("", get_parent().sparat_namn(), spelar_rader[0].figur)], ["Regler", func() -> void: visa_regler(null)]]
 	# på webben går det inte att avsluta programmet
 	if not OS.has_feature("web"):
 		knappar.append(["Avsluta", func() -> void: avsluta.emit()])
@@ -1098,38 +1099,87 @@ var online_lage := false
 
 
 func _bygg_online() -> void:
-	# gå med i bord
+	# gå med i bord: välj figur och namn, inga regelinställningar
 	ga_med_vy = _helskarm(Color(0, 0, 0, 0.6))
-	var p := _centrerad_panel(ga_med_vy, 560, 0)
+	var p := _centrerad_panel(ga_med_vy, 980, 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	p.add_child(v)
-	v.add_child(_lbl("Gå med i bord", 40, true, GULD))
-	v.add_child(_lbl("Bordskod"))
+	ga_titel = _lbl("Gå med i bord", 40, true, GULD)
+	v.add_child(ga_titel)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 24)
+	v.add_child(h)
+	# vänster: figur med snurrande förhandsvisning
+	var fv := VBoxContainer.new()
+	fv.add_theme_constant_override("separation", 8)
+	h.add_child(fv)
+	var fh := _forhandsvisning(Vector2(400, 380))
+	fv.add_child(fh.cont)
+	ga_vp = fh.vp
+	ga_figurnamn = _lbl("", 26, true, KRAM)
+	ga_figurnamn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fv.add_child(ga_figurnamn)
+	var nh := HBoxContainer.new()
+	nh.add_theme_constant_override("separation", 10)
+	fv.add_child(nh)
+	var fore := _knapp("< Föregående", func() -> void: _ga_figur(ga_figur - 1, -1))
+	fore.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nh.add_child(fore)
+	var nasta := _knapp("Nästa >", func() -> void: _ga_figur(ga_figur + 1, 1))
+	nasta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nh.add_child(nasta)
+	# höger: kod, namn, regler i läsläge och Gå med
+	var hv := VBoxContainer.new()
+	hv.add_theme_constant_override("separation", 10)
+	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(hv)
+	ga_kodrad = VBoxContainer.new()
+	hv.add_child(ga_kodrad)
+	ga_kodrad.add_child(_lbl("Bordskod"))
 	ga_kod = LineEdit.new()
 	ga_kod.placeholder_text = "t.ex. K7Q2"
 	ga_kod.max_length = 6
 	ga_kod.add_theme_font_size_override("font_size", 30)
-	v.add_child(ga_kod)
-	v.add_child(_lbl("Ditt namn"))
+	ga_kod.text_changed.connect(func(t: String) -> void:
+		if t.strip_edges().length() >= 4:
+			fraga_bordinfo.emit(t.strip_edges().to_upper()))
+	ga_kodrad.add_child(ga_kod)
+	hv.add_child(_lbl("Ditt namn"))
 	ga_namn = LineEdit.new()
 	ga_namn.max_length = 14
-	v.add_child(ga_namn)
+	ga_namn.add_theme_font_size_override("font_size", 26)
+	ga_namn.text_changed.connect(func(_t: String) -> void: ga_eget_namn = true)
+	hv.add_child(ga_namn)
+	hv.add_child(_rubrik("Partiet"))
+	ga_info = _lbl("Hämtar bordet …", 19, false, KRAM)
+	ga_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ga_info.custom_minimum_size = Vector2(480, 0)
+	hv.add_child(ga_info)
 	ga_status = _lbl("", 18, false, Color(1.0, 0.6, 0.55))
 	ga_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(ga_status)
-	var kh := HBoxContainer.new()
-	kh.add_theme_constant_override("separation", 10)
-	kh.alignment = BoxContainer.ALIGNMENT_END
-	v.add_child(kh)
-	kh.add_child(_knapp("Tillbaka", func() -> void: visa_huvudmeny()))
-	var gb := _knapp("Gå med", func() -> void:
+	ga_status.custom_minimum_size = Vector2(480, 0)
+	hv.add_child(ga_status)
+	var mel0 := Control.new()
+	mel0.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hv.add_child(mel0)
+	ga_knapp = _knapp("Gå med", func() -> void:
 		if ga_kod.text.strip_edges() == "":
 			ga_status.text = "Skriv bordskoden."
 			return
-		ga_med_online.emit(ga_kod.text.strip_edges().to_upper(), ga_namn.text.strip_edges() if ga_namn.text.strip_edges() != "" else "Spelare"), 24)
-	gb.add_theme_color_override("font_color", GULD)
-	kh.add_child(gb)
+		if ga_tagna.has(ga_figur):
+			ga_status.text = "Figuren är upptagen, välj en annan."
+			return
+		var namn: String = ga_namn.text.strip_edges()
+		ga_med_online.emit(ga_kod.text.strip_edges().to_upper(), namn if namn != "" else Figurer.namn(ga_figur), ga_figur), 34)
+	ga_knapp.add_theme_color_override("font_color", GULD)
+	ga_knapp.custom_minimum_size = Vector2(0, 76)
+	hv.add_child(ga_knapp)
+	var kh := HBoxContainer.new()
+	kh.alignment = BoxContainer.ALIGNMENT_END
+	hv.add_child(kh)
+	kh.add_child(_knapp("Tillbaka", func() -> void:
+		lobby_lamna.emit()))
 	# lobby
 	lobby_vy = _helskarm(Color(0, 0, 0, 0.55))
 	var lp := _centrerad_panel(lobby_vy, 1200, 720)
@@ -1217,16 +1267,6 @@ func _klick_start() -> void:
 		_efter_klick.call()
 
 
-func visa_ga_med(kod := "", namn := "") -> void:
-	_gomt_allt()
-	ga_med_vy.visible = true
-	ga_status.text = ""
-	if kod != "":
-		ga_kod.text = kod
-	if namn != "" and ga_namn.text == "":
-		ga_namn.text = namn
-
-
 func visa_lobby_vantar(text: String) -> void:
 	_gomt_allt()
 	lobby_vy.visible = true
@@ -1259,11 +1299,12 @@ func visa_lobby(d: Dictionary, min_plats: int, lank: String) -> void:
 	for x in d.platser:
 		if x.typ == "tom":
 			tomma += 1
-	var t := "Dela länken eller koden %s med dina vänner. " % d.kod
+	var t := ""
 	if varde:
+		t = "Dela länken eller koden %s med dina vänner. " % d.kod
 		t += "Du är värd: fyll tomma platser med robotar och starta när alla sitter." if tomma > 0 else "Alla platser är fyllda – starta när ni är redo."
 	else:
-		t += "Väntar på att värden startar partiet."
+		t = "Väntar på att %s startar partiet …" % str(d.platser[int(d.varde)].namn)
 	lobby_status.text = t
 	for c in lobby_lista.get_children():
 		c.queue_free()
@@ -1445,3 +1486,120 @@ func _figurtext(f: int) -> String:
 func _satt_radfigur(i: int, f: int) -> void:
 	spelar_rader[i].figur = f
 	spelar_rader[i].figurknapp.text = _figurtext(f)
+
+
+# ================================================================== gå med: figur, namn och regler i läsläge
+var ga_titel: Label
+var ga_vp: SubViewport
+var ga_gubbe: Node3D
+var ga_figur := 0
+var ga_figurnamn: Label
+var ga_info: Label
+var ga_knapp: Button
+var ga_kodrad: VBoxContainer
+var ga_tagna := {}
+var ga_eget_namn := false
+
+
+## Liten 3D-scen med egen värld för att visa en snurrande figur.
+func _forhandsvisning(storlek: Vector2) -> Dictionary:
+	var cont := SubViewportContainer.new()
+	cont.stretch = true
+	cont.custom_minimum_size = storlek
+	var vp := SubViewport.new()
+	vp.own_world_3d = true
+	vp.msaa_3d = Viewport.MSAA_4X
+	cont.add_child(vp)
+	var env := WorldEnvironment.new()
+	var e := Environment.new()
+	e.background_mode = Environment.BG_COLOR
+	e.background_color = Color(0.06, 0.16, 0.1)
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	e.ambient_light_color = Color(0.85, 0.82, 0.78)
+	e.ambient_light_energy = 0.55
+	e.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.environment = e
+	vp.add_child(env)
+	var sol := DirectionalLight3D.new()
+	sol.rotation = Vector3(-0.6, 0.5, 0)
+	sol.light_energy = 1.3
+	vp.add_child(sol)
+	var kam := Camera3D.new()
+	kam.transform = Transform3D(Basis(), Vector3(0, 2.4, 8.0)).looking_at(Vector3(0, 1.7, 0), Vector3.UP)
+	kam.fov = 38
+	vp.add_child(kam)
+	return {"cont": cont, "vp": vp}
+
+
+## riktning: hoppa över upptagna figurer åt det hållet (0 = visa just denna).
+func _ga_figur(i: int, riktning: int) -> void:
+	var n := Figurer.antal()
+	var f := posmod(i, n)
+	if riktning != 0:
+		for k in n:
+			if not ga_tagna.has(f):
+				break
+			f = posmod(f + riktning, n)
+	var gammalt_namn := Figurer.namn(ga_figur)
+	ga_figur = f
+	if ga_gubbe:
+		ga_gubbe.queue_free()
+	ga_gubbe = Gubbe.new()
+	ga_vp.add_child(ga_gubbe)
+	ga_gubbe.bygg_figur(f)
+	ga_gubbe.rotation.y = PI
+	ga_gubbe.titta_pa(Vector3(0, 2.4, 8.0))
+	var upptagen := ga_tagna.has(f)
+	ga_figurnamn.text = Figurer.namn(f) + ("  (upptagen)" if upptagen else "")
+	ga_figurnamn.add_theme_color_override("font_color", Color(1.0, 0.55, 0.5) if upptagen else KRAM)
+	ga_knapp.disabled = upptagen
+	# namnet följer figuren tills man själv skrivit något
+	if not ga_eget_namn or ga_namn.text.strip_edges() == "" or ga_namn.text == gammalt_namn:
+		ga_namn.text = Figurer.namn(f)
+		ga_eget_namn = false
+
+
+func visa_ga_med(kod := "", namn := "", figur := 0) -> void:
+	_gomt_allt()
+	ga_med_vy.visible = true
+	ga_status.text = ""
+	ga_tagna = {}
+	ga_info.text = "Skriv bordskoden." if kod == "" else "Hämtar bord %s …" % kod
+	ga_kodrad.visible = kod == ""
+	ga_titel.text = "Gå med i bord" if kod == "" else "Gå med i bord %s" % kod
+	ga_kod.text = kod
+	ga_eget_namn = namn != ""
+	ga_namn.text = namn
+	_ga_figur(maxi(figur, 0), 0)
+	if namn == "":
+		ga_namn.text = Figurer.namn(ga_figur)
+	if kod != "":
+		fraga_bordinfo.emit(kod)
+
+
+## Svar från servern om bordet: regler i läsläge, värd och tagna figurer.
+func visa_bordinfo(d: Dictionary) -> void:
+	if not ga_med_vy.visible or str(d.kod) != ga_kod.text.strip_edges().to_upper():
+		return
+	if not d.get("finns", false):
+		ga_info.text = "Bordet %s finns inte. Kontrollera koden." % d.kod
+		ga_knapp.disabled = true
+		return
+	ga_tagna = {}
+	var lediga := 0
+	var namnen: Array = []
+	for x in d.platser:
+		if x.typ == "tom":
+			lediga += 1
+		elif int(x.figur) >= 0:
+			ga_tagna[int(x.figur)] = true
+		if x.typ != "tom":
+			namnen.append(str(x.namn))
+	var r := Regler.new()
+	r.fran_dict(d.regler)
+	var t := "Värd: %s\n%s\n" % [d.varde_namn, r.kort_sammanfattning()]
+	t += "Vid bordet: %s · %d %s" % [", ".join(namnen), lediga, "ledig plats" if lediga == 1 else "lediga platser"]
+	if d.startad:
+		t += "\nPartiet har redan börjat."
+	ga_info.text = t
+	_ga_figur(ga_figur, 1)

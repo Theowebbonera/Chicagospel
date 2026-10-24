@@ -41,7 +41,8 @@ func parti(nivaer: Array, r, fro: int) -> Dictionary:
 	rng.seed = fro * 31 + 1
 	var stat := {"givar": 0, "chicago": 0, "chicago_ok": 0, "drag": 0, "vinnare": -1, "stick_tvaa": 0}
 	var giv := 0
-	while m.fas != Motor.Fas.SLUT and giv < 400:
+	# säkerhetstak: ett parti får inte bli oändligt
+	while m.fas != Motor.Fas.SLUT and giv < 1500:
 		m.ny_giv()
 		giv += 1
 		var steg := 0
@@ -78,9 +79,10 @@ func parti(nivaer: Array, r, fro: int) -> Dictionary:
 	stat.givar = giv
 	stat.vinnare = m.vinnare
 	_ok(m.fas == Motor.Fas.SLUT, "partiet tog inte slut")
-	_ok(m.vinnare >= 0 and m.poang[m.vinnare] >= r.malpoang, "vinnaren har nått målpoängen")
-	for q in m.n:
-		_ok(m.poang[q] <= m.poang[m.vinnare], "ingen har fler poäng än vinnaren")
+	_ok(m.vinnare >= 0 and m.far_vinna(m.vinnare), "vinnaren uppfyller vinstvillkoren (målpoäng och vid husregeln en tagen Chicago)")
+	if m.vinnare >= 0:
+		for q in m.n:
+			_ok(not m.far_vinna(q) or m.poang[q] <= m.poang[m.vinnare], "ingen annan som uppfyller villkoren har fler poäng")
 	return stat
 
 

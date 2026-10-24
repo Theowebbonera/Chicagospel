@@ -214,16 +214,45 @@ func _init() -> void:
 	print("bord skapat: ", anna.kod)
 	_ok(anna.kod.length() == 4 and anna.plats == 0, "kod med fyra tecken och värden på plats 0")
 	_ok(int(anna.regler_d.get("malpoang", 0)) == 20, "lobbyn visar bordets regler")
+	# den som ska gå med får först bordets information: regler i läsläge och tagna figurer
+	var titt := _bot("Titt")
+	var info := {}
+	titt.k.meddelande.connect(func(d: Dictionary) -> void:
+		if d.t == "bordinfo":
+			info.merge(d, true))
+	titt.k.skicka({"t": "bordinfo", "kod": anna.kod})
+	await _vanta_pa(func() -> bool: return not info.is_empty(), 3.0, "bordinfo")
+	_ok(info.get("finns", false) and info.varde_namn == "Anna" and int(info.platser[0].figur) == 3 and int(info.regler.malpoang) == 20, "bordinfo med värd, regler och tagen figur")
+	# samma figur som Anna går inte
+	var dubbel := _bot("Dubbel")
+	dubbel.k.skicka({"t": "ga_med", "kod": anna.kod, "namn": "Dubbel", "figur": 3})
+	await _vanta_pa(func() -> bool: return not dubbel.felmeddelanden.is_empty(), 3.0, "dubbel figur avvisas")
+	_ok(dubbel.plats < 0, "dubbel figur gav ingen plats")
 	var bo := _bot("Bo")
-	bo.k.skicka({"t": "ga_med", "kod": anna.kod.to_lower(), "namn": "Bo"})
+	bo.k.skicka({"t": "ga_med", "kod": anna.kod.to_lower(), "namn": "Bo", "figur": 5})
 	var cia := _bot("Cia")
-	cia.k.skicka({"t": "ga_med", "kod": anna.kod, "namn": "Cia"})
+	cia.k.skicka({"t": "ga_med", "kod": anna.kod, "namn": "Cia", "figur": 7})
 	await _vanta_pa(func() -> bool: return bo.plats >= 0 and cia.plats >= 0, 5.0, "Bo och Cia går med")
 	_ok(bo.plats == 1 and cia.plats == 2, "platser 1 och 2")
 	# fel bordskod
 	var fel_bot := _bot("Fel")
 	fel_bot.k.skicka({"t": "ga_med", "kod": "ZZZZ", "namn": "X"})
 	await _vanta_pa(func() -> bool: return not fel_bot.felmeddelanden.is_empty(), 3.0, "fel kod avvisas")
+	# bara värden får ändra regler, lägga till robotar, fylla platser och starta
+	cia.felmeddelanden.clear()
+	cia.k.skicka({"t": "plats", "plats": 3, "typ": "robot", "niva": 1})
+	cia.k.skicka({"t": "regler", "regler": {"malpoang": 99}})
+	cia.k.skicka({"t": "fyll"})
+	cia.k.skicka({"t": "figur", "figur": 5})
+	await _vanta_pa(func() -> bool: return cia.felmeddelanden.size() >= 4, 3.0, "icke-värd avvisas")
+	_ok(server.bord[anna.kod].platser[3].typ == "tom" and server.bord[anna.kod].regler.malpoang == 20, "icke-värd ändrade inget")
+	_ok(server.bord[anna.kod].platser[2].figur == 7, "Cia fick inte ta Bos figur")
+	# värden kan ändra reglerna före start
+	var r2 := Regler.new()
+	r2.malpoang = 20
+	r2.kopstopp = 30
+	anna.k.skicka({"t": "regler", "regler": r2.till_dict()})
+	await _vanta_pa(func() -> bool: return server.bord[anna.kod].regler.kopstopp == 30, 3.0, "värden ändrar regler")
 	# bara värden får starta, och alla platser måste vara fyllda
 	bo.k.skicka({"t": "starta"})
 	anna.k.skicka({"t": "starta"})
@@ -247,7 +276,7 @@ func _init() -> void:
 	var unika := {}
 	for f in figs:
 		unika[f] = true
-	_ok(figs[0] == 3 and not figs.has(-1) and unika.size() == figs.size(), "figurer efter start: %s" % [figs])
+	_ok(figs[0] == 3 and figs[1] == 5 and figs[2] == 7 and not figs.has(-1) and unika.size() == figs.size(), "figurer efter start: %s" % [figs])
 	# otillåtna drag: fel tur och kort man inte har
 	var m = server.bord[anna.kod].motor
 	var tur: int = m.tur
@@ -293,7 +322,7 @@ func _init() -> void:
 	_ok(anna.s.vinnare == m.vinnare, "klienterna får veta vinnaren")
 	# städning: alla går, bordet tas bort
 	var kod := anna.kod
-	for x in [anna, bo2, cia, sen, fel_bot]:
+	for x in [anna, bo2, cia, sen, fel_bot, titt, dubbel]:
 		x.k.koppla_fran()
 	await _vanta_pa(func() -> bool: return not server.bord.has(kod), 8.0, "tomt bord städas bort")
 	print("meddelanden inspekterade: %d (varav %d giv-händelser)" % [meddelanden, korthandelser])

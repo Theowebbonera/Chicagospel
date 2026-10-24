@@ -34,6 +34,7 @@ func _fall(namn: String, manniska: Array, givar: int) -> void:
 	var overlamningar := 0
 	var sag_overlamning := false
 	var kontroller := 0
+	var poangkoll := 0
 	var t0 := Time.get_ticks_msec()
 	while rutor < 200000 and Time.get_ticks_msec() - t0 < 150000:
 		await process_frame
@@ -57,6 +58,12 @@ func _fall(namn: String, manniska: Array, givar: int) -> void:
 		sag_overlamning = main.ui.overlamning.visible
 		if main.motor == null or main.meny_lage:
 			continue
+		# givens poäng visas direkt: under bytena stämmer poängtavlan med motorns totaler
+		if main.vantar_pa_drag and main.motor.fas == main.Motor.Fas.BYTE:
+			poangkoll += 1
+			if main.vis_poang != main.motor.poang:
+				brott += 1
+				print("FEL (%s): poängtavlan %s visar inte givens poäng %s under bytena" % [namn, main.vis_poang, main.motor.poang])
 		var kam: Vector3 = main.kam.global_position
 		for c in 52:
 			var k = main.kort[c]
@@ -73,7 +80,7 @@ func _fall(namn: String, manniska: Array, givar: int) -> void:
 				print("FEL (%s): kort %d syns (ägare %d, robot %s) giv %d" % [namn, c, agare, str(agare >= 0 and main.spelare[agare].robot), main.motor.giv_nr])
 		if main.motor.giv_nr > givar or main.motor.fas == main.Motor.Fas.SLUT:
 			break
-	print("%s: %d bildrutor, %d givar, %d synliga kortlägen kontrollerade, %d överlämningar, %d brott" % [namn, rutor, main.motor.giv_nr, kontroller, overlamningar, brott])
+	print("%s: %d bildrutor, %d givar, %d synliga kortlägen kontrollerade, %d poängkontroller under bytena, %d överlämningar, %d brott" % [namn, rutor, main.motor.giv_nr, kontroller, poangkoll, overlamningar, brott])
 	if brott > 0:
 		fel += 1
 	if manniska.count(true) > 1 and overlamningar == 0:

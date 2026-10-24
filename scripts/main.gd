@@ -135,6 +135,7 @@ func _ready() -> void:
 	ui.spela_igen.connect(_spela_igen)
 	ui.skapa_online.connect(skapa_online)
 	ui.ga_med_online.connect(ga_med_online)
+	ui.fraga_bordinfo.connect(fraga_bordinfo)
 	ui.lobby_plats.connect(lobby_plats)
 	ui.lobby_fyll.connect(lobby_fyll)
 	ui.lobby_starta.connect(lobby_starta)
@@ -197,7 +198,11 @@ func _ready() -> void:
 		var kod := Natverk.bord_fran_adress()
 		var efter := func() -> void:
 			if kod != "":
-				ui.visa_ga_med(kod, sparat_namn())
+				ui.visa_ga_med(kod, sparat_namn(), ui.spelar_rader[0].figur)
+				if "--ga-med-direkt" in args:
+					# inspelning: tryck på Gå med efter en stund
+					get_tree().create_timer(4.0).timeout.connect(func() -> void:
+						ga_med_online(kod, ui.ga_namn.text, ui.ga_figur))
 		if OS.has_feature("web"):
 			ui.visa_klick_start(efter)
 		else:
@@ -963,6 +968,14 @@ func _fran_lek(c: int) -> void:
 
 
 func _tavla() -> void:
+	if motor != null and "chicago_tagen" in motor:
+		for i in mini(n, brickor.size()):
+			var tagen: bool = i < motor.chicago_tagen.size() and motor.chicago_tagen[i]
+			var behover: bool = regler.chicago_kravs_for_vinst and regler.chicago_tillatet and i < vis_poang.size() and vis_poang[i] >= regler.malpoang and not tagen
+			if behover:
+				brickor[i] = "behöver Chicago"
+			elif brickor[i] == "behöver Chicago":
+				brickor[i] = "Chicago tagen" if tagen else ""
 	var tur := -1
 	if motor and (motor.fas == Motor.Fas.BYTE or motor.fas == Motor.Fas.STICK):
 		tur = motor.tur
@@ -1725,6 +1738,9 @@ func _poang_anim(e: Dictionary, id: int) -> void:
 	if e.has("poang_efter"):
 		vis_poang = e.poang_efter.duplicate()
 	var pts: int = e.poang
+	# husregeln: når man målet utan Chicago fortsätter partiet
+	if regler.chicago_kravs_for_vinst and regler.chicago_tillatet and p == betraktare and not spelare[p].robot and vis_poang[p] >= regler.malpoang and not _chicago_tagen(p):
+		ui.logga("Du har %d poäng men behöver en lyckad Chicago för att vinna." % vis_poang[p], UI.GULD)
 	var txt := ("+%d" % pts) if pts >= 0 else ("−%d" % -pts)
 	_popup(p, txt, UI.GULD if pts >= 0 else Color(1.0, 0.4, 0.35))
 	if p < gubbar.size():
@@ -1829,16 +1845,30 @@ func skapa_online(namn: String, antal: int, r, vis: Dictionary) -> void:
 	online_namn = namn
 	visning = vis.duplicate()
 	ui.visa_lobby_vantar("Ansluter till servern …")
-	_klient().anslut(_server_url())
+	_anslut_om_behovs()
 	klient.skicka({"t": "skapa", "namn": namn, "antal": antal, "regler": r.till_dict(), "robotlek": vis.get("kasta_tillbaka", true), "figur": ui.spelar_rader[0].figur})
 
 
-func ga_med_online(kod: String, namn: String) -> void:
+func ga_med_online(kod: String, namn: String, figur: int) -> void:
 	online_namn = namn
 	online_kod = kod.to_upper().strip_edges()
-	ui.visa_lobby_vantar("Ansluter till bord %s …" % online_kod)
-	_klient().anslut(_server_url())
-	klient.skicka({"t": "ga_med", "kod": online_kod, "namn": namn, "token": _sparad_token(online_kod), "figur": ui.spelar_rader[0].figur})
+	# kom ihåg figurvalet till nästa gång
+	ui._satt_radfigur(0, figur)
+	ui._spara_installningar()
+	_anslut_om_behovs()
+	klient.skicka({"t": "ga_med", "kod": online_kod, "namn": namn, "token": _sparad_token(online_kod), "figur": figur})
+
+
+## Frågar servern om ett bord (regler, värd, tagna figurer) innan man går med.
+func fraga_bordinfo(kod: String) -> void:
+	_anslut_om_behovs()
+	klient.skicka({"t": "bordinfo", "kod": kod})
+
+
+func _anslut_om_behovs() -> void:
+	_klient()
+	if not klient.ar_ansluten() and klient.url == "":
+		klient.anslut(_server_url())
 
 
 func _sparad_token(kod: String) -> String:
@@ -1886,6 +1916,8 @@ func _natmeddelande(d: Dictionary) -> void:
 			# återanslutning: börja om flödet så att pågående animeringar avbryts, och bygg bordet från serverns läge
 			_starta_online(d)
 			nat_nytt.emit()
+		"bordinfo":
+			ui.visa_bordinfo(d)
 		"kast":
 			if online_kor and not meny_lage:
 				_kasta(d.fran, d.till, d.vad, false)

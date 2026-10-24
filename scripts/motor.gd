@@ -2,9 +2,10 @@ extends RefCounted
 ## Regelmotorn för Chicago. Ren logik utan grafik: styrs med drag (byt, ropa_chicago, spela)
 ## och lägger allt som händer i en händelselista som grafiken spelar upp i ordning.
 ##
-## Poäng: `intern` är den löpande totalen som reglerna använder (köpstopp, rätt att ropa Chicago, fyrtal som
-## nollställer). `poang` är det som visas. Med regeln "visa vid rundslut" (standard) samlas rundans poäng
-## och redovisas först när sticket är klart.
+## Poäng: givens hand (och poäng efter byten) läggs till och visas direkt. Stick-rundans poäng (sluthand, sista
+## sticket, tvåan, Chicago) samlas med regeln "visa vid rundslut" (standard) och redovisas när sticket är klart.
+## `intern` är totalen inklusive stick-rundans ännu ej visade poäng; under byten och Chicago-frågan är den lika
+## med den visade totalen, så köpstopp och Chicago-rätt följer det som syns.
 
 const K := preload("res://scripts/kort.gd")
 const H := preload("res://scripts/handvarde.gd")
@@ -266,10 +267,11 @@ func _poangrakning(nar: String, faktor: int, vilka: Array) -> void:
 	for p in lista:
 		_ge_poang(p, pts, "hand", H.KAT_NAMN[kat].to_lower(), nar)
 		if kat == H.FYRTAL and regler.fyrtal_nollstaller:
-			_nollstall_andra(p)
+			_nollstall_andra(p, nar)
 		if kat == H.ROYAL and regler.royal_vinner and royal_vinst < 0:
 			royal_vinst = p
-	if not regler.visa_vid_rundslut:
+	# givens hand och byten redovisas direkt; sluthanden hör till stick-rundan (avgörs i _rundans_slut)
+	if nar != "sluthand":
 		if royal_vinst >= 0:
 			_vinst(royal_vinst)
 			return
@@ -287,17 +289,20 @@ func _ge_poang(p: int, pts: int, orsak: String, text: String, nar := "") -> void
 
 
 ## Fyrtal: alla andra spelares total blir noll.
-func _nollstall_andra(p: int) -> void:
+func _nollstall_andra(p: int, nar := "") -> void:
 	var vilka: Array = []
 	for q in n:
 		if q != p:
 			intern[q] = 0
 			vilka.append(q)
-	_poanghandelse({"typ": "nollstall", "spelare": p, "nollstallda": vilka})
+	_poanghandelse({"typ": "nollstall", "spelare": p, "nollstallda": vilka, "nar": nar})
 
 
+## Givens hand (och poäng efter byten) visas direkt. Stick-rundans poäng (sluthand, sista sticket, tvåan,
+## Chicago) visas med regeln "visa vid rundslut" först när sticket är klart.
 func _poanghandelse(e: Dictionary) -> void:
-	if regler.visa_vid_rundslut:
+	var stickrunda: bool = e.get("nar", "") == "sluthand" or e.get("orsak", "") in ["stick", "chicago", "chicago_miss"]
+	if regler.visa_vid_rundslut and stickrunda:
 		vantande.append(e)
 	else:
 		_redovisa_en(e)
@@ -327,10 +332,26 @@ func _redovisa() -> void:
 	poang = intern.duplicate()
 
 
+## Vinst: total minst målpoängen och (med husregeln) en lyckad Chicago någon gång i partiet.
+## Uppfyller flera villkoren vinner högst total, vid lika den som är först i tur efter given.
+func far_vinna(p: int) -> bool:
+	return poang[p] >= regler.malpoang and (not kravs_chicago() or chicago_tagen[p])
+
+
+## Kravet gäller bara när Chicago får ropas (annars kunde ingen vinna).
+func kravs_chicago() -> bool:
+	return regler.chicago_kravs_for_vinst and regler.chicago_tillatet
+
+
+## Har nått målpoängen men saknar Chicago (offentligt: både poäng och Chicago-markering syns).
+func behover_chicago(p: int) -> bool:
+	return kravs_chicago() and poang[p] >= regler.malpoang and not chicago_tagen[p]
+
+
 func _kolla_vinst() -> bool:
 	var w := -1
 	for p in i_ordning(forhand()):
-		if poang[p] >= regler.malpoang and (w < 0 or poang[p] > poang[w]):
+		if far_vinna(p) and (w < 0 or poang[p] > poang[w]):
 			w = p
 	if w < 0:
 		return false
