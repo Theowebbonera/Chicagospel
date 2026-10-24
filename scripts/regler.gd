@@ -21,7 +21,7 @@ var p_royal := 52
 var fyrtal_nollstaller := true  # fyrtal nollställer alla andras totalpoäng
 # --- när pokerhänderna poängsätts
 var poang_vid_given := 1  # 0 nej, 1 ja (givens hand innan något byte), 2 ja med dubbla poäng
-var poang_byten := 0  # 0 inga poäng efter bytena, 1 efter varje byte utom det sista, 2 efter varje byte
+var poang_byten := 1  # 0 inga poäng efter bytena, 1 efter varje byte utom det sista (standard: varje giv), 2 efter varje byte
 var poang_efter_stick := true  # handen man spelade sticket med poängsätts efter sticket
 var visa_vid_rundslut := true  # stick-rundans poäng (sluthand, stick, Chicago) visas när sticket är klart
 var lika_regel := 0  # 0 den som är först i tur efter given, 1 ingen får poäng, 2 alla med lika hand får poäng
@@ -67,7 +67,7 @@ const LISTA := [
 	{"grupp": "När händerna poängsätts"},
 	{"namn": "poang_vid_given", "text": "Givens hand (innan något byte)", "typ": "val", "val": ["Nej", "Ja", "Ja, dubbla poäng"], "hjalp": "De utdelade korten poängsätts innan första bytet. Räknas även om någon ropar Chicago."},
 	{"namn": "poang_efter_stick", "text": "Handen man spelade sticket med", "typ": "bool", "hjalp": "Händerna som de såg ut när sticken började poängsätts efter sticket. Lyckas någon med Chicago delas de poängen inte ut."},
-	{"namn": "poang_byten", "text": "Poäng efter bytena", "typ": "val", "val": ["Nej", "Efter varje byte utom det sista", "Efter varje byte"], "hjalp": "Äldre variant där händerna poängsätts direkt efter bytena."},
+	{"namn": "poang_byten", "text": "Poäng efter bytena", "typ": "val", "val": ["Nej", "Efter varje byte utom det sista", "Efter varje byte"], "hjalp": "Standard: poäng efter varje giv (given, byte 1, byte 2). Det sista bytet leder till stick-rundan, som poängsätts efter sticket."},
 	{"namn": "visa_vid_rundslut", "text": "Visa stick-rundans poäng efter sticket", "typ": "bool", "hjalp": "Givens hand visas direkt. Poäng för sluthanden, sista sticket, tvåan och Chicago visas och läggs till när sticket är klart."},
 	{"namn": "lika_regel", "text": "Vid lika händer", "typ": "val", "val": ["Först i tur efter given vinner", "Ingen får poäng", "Alla med lika hand får poäng"], "hjalp": "Händerna jämförs i hemlighet i turordning med början hos spelaren efter given. Inga kort visas."},
 	{"namn": "ess_lag", "text": "Ess kan vara lågt i stege (E-2-3-4-5)", "typ": "bool"},
@@ -206,7 +206,7 @@ func beskrivning() -> String:
 		nar.append("handen man spelade sticket med, efter sticket")
 	t += "[b]Poäng för pokerhänder:[/b] %s. Bara den bästa handen vid bordet får poäng, och högt kort ger inget." % (", ".join(nar) if not nar.is_empty() else "inga")
 	if visa_vid_rundslut:
-		t += " Givens hand räknas och visas direkt. Stick-rundans poäng (handen efter sticket, sista sticket och Chicago) visas när sticket är klart."
+		t += " Poängen efter varje giv (given och byten utom det sista) räknas och visas direkt. Stick-rundans poäng (handen efter sticket, sista sticket och Chicago) visas när sticket är klart."
 	t += " Inga kort vänds: spelet säger bara vem som tar poängen och vilken sorts hand det är (till exempel \"Anna: färg, 5 poäng\")."
 	var lika: String = ["får den som är först i tur efter given poängen", "får ingen poäng", "får alla med lika hand poäng"][lika_regel]
 	t += " Vid exakt lika hand %s.\n" % lika

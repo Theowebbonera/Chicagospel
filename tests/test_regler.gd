@@ -70,7 +70,7 @@ func _handvardering() -> void:
 	var r := Regler.new()
 	_ok(r.kat_poang(H.PAR) == 1 and r.kat_poang(H.FYRTAL) == 8 and r.kat_poang(H.FARGSTEGE) == 10 and r.kat_poang(H.ROYAL) == 52, "standardtabell (husregler)")
 	_ok(r.stick_poang == 2 and r.tvaa_poang == 5 and r.tvaa_bonus, "standard: sista sticket 2, ut på en tvåa 5")
-	_ok(r.fyrtal_nollstaller and r.poang_vid_given == 1 and r.poang_byten == 0 and r.poang_efter_stick and r.visa_vid_rundslut, "standard: poäng vid given och efter sticket, visas efter sticket")
+	_ok(r.fyrtal_nollstaller and r.poang_vid_given == 1 and r.poang_byten == 1 and r.poang_efter_stick and r.visa_vid_rundslut, "standard: poäng vid given och efter sticket, visas efter sticket")
 	_ok(r.kopstopp_pa and r.kopstopp == 41 and r.chicago_min == 15 and r.chicago_en_gang, "standard: köpstopp 41, Chicago från 15, en gång per parti")
 	# äldre sparfil (före husreglerna) läses inte in, ny sparfil behåller sina värden
 	var cf := ConfigFile.new()
@@ -551,12 +551,20 @@ func _husregler() -> void:
 	var typer := _typer(h)
 	_ok("redovisning" in typer, "stick-rundans poäng redovisas efter sticket")
 	var slut := 0
-	for e in h:
+	var byten := 0
+	var red := typer.find("redovisning")
+	var forsta_stick := typer.find("stick_start")
+	for i in h.size():
+		var e: Dictionary = h[i]
 		if e.typ == "poang" and e.orsak == "hand":
-			_ok(e.nar == "sluthand", "efter sticket redovisas bara stick-rundan")
-			if e.nar == "sluthand":
+			if i > red:
+				_ok(e.nar == "sluthand", "efter sticket redovisas bara stick-rundan")
 				slut += 1
-	_ok(given == 1 and slut == 1, "poäng för givens hand och för handen efter sticket (%d, %d)" % [given, slut])
+			else:
+				_ok(e.nar == "byte" and i < forsta_stick, "poäng efter byte 1 och 2 visas direkt, före sticken")
+				byten += 1
+	_ok(given == 1 and byten == 2 and slut == 1, "poäng efter given, byte 1, byte 2 och sluthanden (%d, %d, %d)" % [given, byten, slut])
+	_ok(typer.count("byte_start") == 2, "byte 2 och 3 efter första delen (byte 1 började direkt efter given)")
 	_ok(m.poang == m.intern and m.poang[1] >= 2, "visade poäng = löpande efter sticket: %s" % [m.poang])
 	_ok(typer.find("redovisning") > typer.rfind("spela"), "redovisningen kommer efter sista spelade kortet")
 

@@ -15,8 +15,8 @@ Allt går att ändra under **Nytt parti** eller **Skapa bord online**. Knappen *
 | Målpoäng och vinst | 52, **och man måste ha tagit Chicago för att vinna** (inställning, på; av i klassiska regler). Når man 52 utan Chicago fortsätter partiet: poängen räknas vidare, köpstoppet gäller och man kan fortfarande ropa Chicago. Vinsten kontrolleras varje gång poäng läggs till, både vid givens hand och efter sticket. Uppfyller flera villkoren vinner högst total, och vid lika vinner den som är först i tur efter given. En lyckad Chicago som tar spelaren över 52 vinner. Poängtavlan visar "behöver Chicago" för den som har nått målet utan Chicago. Kravet gäller bara när Chicago får ropas, och royal straight flush (om "vinner direkt" är på) vinner oavsett. |
 | Poängtabell | par 1, två par 2, triss 3, stege 4, färg 5, kåk 6, **fyrtal 8**, **färgstege 10**, royal straight flush 52 |
 | Fyrtal | **nollställer alla andra spelares totalpoäng** (inställning, på) |
-| När händerna poängsätts | **givens hand** (de utdelade korten innan något byte) och **handen man spelade sticket med**, efter sticket. Inga poäng efter bytena. Den äldre varianten med poäng efter varje byte finns kvar som inställning. |
-| Visning | **givens hand visas och läggs till direkt** (före bytena), liksom poäng efter byten om den inställningen är på. Ett fyrtal vid given nollställer de andra direkt i poängtavlan. **Bara stick-rundan** (sluthandens poäng, sista sticket eller tvåan, Chicago +15 eller −15) visas och läggs till när sticket är klart. |
+| När händerna poängsätts | **efter varje giv**: varje utdelning av kort räknas som en giv, alltså första given, byte 1 och byte 2 (med standard tre byten). Pokerhanden poängsätts och **visas direkt** efter varje sådan giv. Efter det sista bytet följer stick-rundan, där **handen man spelade sticket med** poängsätts efter sticket. Den som har köpstopp byter inte, men hans hand poängsätts ändå vid varje giv. Inställningarna heter "Givens hand", "Poäng efter bytena: efter varje byte utom det sista" och "Handen man spelade sticket med". |
+| Visning | **poängen efter given, byte 1 och byte 2 visas och läggs till direkt**. Ett fyrtal vid given nollställer de andra direkt i poängtavlan. **Bara stick-rundan** (sluthandens poäng, sista sticket eller tvåan, Chicago +15 eller −15) visas och läggs till när sticket är klart. |
 | Bara bästa handen | bara den bästa handen vid bordet får poäng, och högt kort ger inget. Vid exakt lika får den som är först i tur efter given poängen. |
 | Köpstopp | den som har **41 poäng eller mer** får inte byta och står över bytena (inställbart) |
 | Byten | 3 omgångar, 0–5 kort |
@@ -93,6 +93,29 @@ Lokal server: `Godot_v4.7.2-stable_win64_console.exe --headless --path . -- --se
   - `instance uniform` (kortglöden) fungerar.
   - MSAA och `ALPHA_TO_COVERAGE` är begränsade i WebGL, så korthörnen blir lite skarpare.
 
+## Mobil och iPhone (Safari)
+- **Stående läge:** skärmen **"Vrid telefonen"** visas, eftersom spelet spelas liggande. Vid första trycket ber sidan om fullskärm och om att låsa till liggande (`screen.orientation.lock`). Det fungerar på Android. På iPhone Safari finns ingen fullskärm eller låsning, så där vrider man själv.
+- **Liggande på telefon:** gränssnittet skalas upp (`content_scale_factor` 1.5) och huvudmenyn är kompaktare. Paneler som inte får plats krymps och går att rulla. Kastmenyn har större text.
+- **Touch:** `emulate_mouse_from_touch` är på. Kort, knappar och figurer räknas om vid själva trycket, så att touch träffar rätt även utan muspekare.
+- **Lättare grafik på mobil:** 3D-vyn renderas i 75 % upplösning, och 3D-MSAA är av på webben.
+- **Kända orsaker till svart eller vit sida på webben, och vad som är gjort:**
+  - MSAA 2D och 3D är avstängt på webben (`msaa_*.web=0`, även i kortatlasens och figurvisningens SubViewports). Det tar bort varningen "2D MSAA is not yet supported for GLES3".
+  - HDR 2D, glöd och SSAO är avstängda på webben, så att inga float-renderbuffertar behövs.
+  - Kortatlasen ritas i 70 % storlek på webben, vilket ger cirka 2900×1180 i stället för 4200×1680 och mindre minne.
+  - Texturkomprimering för mobil (ETC2/ASTC) är på i projektet och i webbexporten (`vram_texture_compression/for_mobile`).
+  - Ljudet använder Web Audio-sampel (`audio/general/default_playback_type.web=1`) i stället för AudioWorklet-strömmar.
+  - Minne: Godot 4.7:s webbmall har ingen inställning för startminnet i exporten. Minnet växer vid behov, och den mindre kortatlasen minskar toppen.
+- **Krav på webbläsaren:** Godot 4.7:s mall utan trådar använder modern JavaScript (`??=`, `?.`, BigInt64Array, WebAssembly med BigInt) och kräver WebGL 2. Det motsvarar i praktiken **Safari och iOS 15 eller nyare**, men **iOS 16 eller nyare rekommenderas**, eftersom WebGL 2 i iOS 15 har fler fel. Exakt minimiversion har inte kunnat provas här, eftersom ingen WebKit finns lokalt.
+- **Felruta på sidan:** webbexportens HTML (`html/head_include` i `export_presets.cfg`, källan finns i `verktyg/webbdiagnos.html`) har ett tidigt skript som fångar `window.onerror`, `unhandledrejection`, `console.error` och `console.warn`. Om spelet inte har startat efter 30 sekunder visas en röd ruta längst ned med:
+  - webbläsarens user agent
+  - om WebGL 2 finns
+  - vilka tillägg som saknas (`EXT_color_buffer_float`, `OES_texture_float_linear` och `WEBGL_compressed_texture_*`)
+  - största texturstorlek
+  - Godots `Engine.getMissingFeatures()`
+  - alla fel som fångats
+
+  Rutan kan också tas fram direkt med `?diag=1` i adressen, och den stängs genom att trycka på den.
+
 ## Lägga upp onlinespelet (gratis)
 Du skapar kontona själv. Inget är uppladdat härifrån.
 
@@ -156,7 +179,7 @@ Du skapar kontona själv. Inget är uppladdat härifrån.
     - Theos exempel (−12)
     - givens poäng räknas även när Chicago ropas
     - Chicago en gång per parti, även efter nollställning, och tillåtet igen efter misslyckad
-    - givens poäng visas direkt (före bytena) och bara stick-rundan efter sticket
+    - poäng efter given, byte 1 och byte 2 visas direkt, och bara stick-rundan efter sticket
     - 52 utan Chicago ger ingen vinst, en Chicago som tar spelaren över 52 vinner, och den som tagit Chicago och sedan nollställts vinner vid 52. Utan regeln vinner 52 direkt, och högst total vinner när flera når målet.
     - robotar följer reglerna
   - sparfiler

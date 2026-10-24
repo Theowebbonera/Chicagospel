@@ -3,6 +3,7 @@ extends CanvasLayer
 ## poängtavla, fas, banderoller, åtgärdsknappar, händelselogg, överlämning mellan människor, paus och slutskärm.
 
 const Regler := preload("res://scripts/regler.gd")
+const Natverk := preload("res://scripts/natverk.gd")
 const Figurer := preload("res://scripts/figurer.gd")
 const Gubbe := preload("res://scripts/gubbe.gd")
 
@@ -36,6 +37,9 @@ const TYPER := ["Människa", "Robot – lätt", "Robot – medel", "Robot – sv
 const STANDARDNAMN := ["Theo", "Astrid", "Bertil", "Cecilia", "Doris", "Erik"]
 
 var font_r: FontVariation
+var paneler: Array = []
+var mobil := false
+var vrid_vy: Control
 var font_b: FontVariation
 var tema: Theme
 
@@ -87,6 +91,7 @@ var ar_pausad := false
 
 func _ready() -> void:
 	layer = 5
+	mobil = Natverk.ar_mobil()
 	_tema()
 	_bygg_hud()
 	_bygg_huvudmeny()
@@ -97,6 +102,8 @@ func _ready() -> void:
 	_bygg_slut()
 	_bygg_online()
 	_bygg_figurvaljare()
+	_bygg_vrid()
+	get_viewport().size_changed.connect(_anpassa_paneler)
 	visa_huvudmeny()
 
 
@@ -245,14 +252,38 @@ func _helskarm(farg := Color(0, 0, 0, 0)) -> Control:
 	return c
 
 
-func _centrerad_panel(foralder: Control, bredd: float, hojd: float) -> PanelContainer:
+## Panel i mitten. Är skärmen för liten (t.ex. mobil) krymps panelen och innehållet går att rulla.
+func _centrerad_panel(foralder: Control, bredd: float, hojd: float) -> Control:
 	var cc := CenterContainer.new()
 	foralder.add_child(cc)
 	cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var p := PanelContainer.new()
-	p.custom_minimum_size = Vector2(bredd, hojd)
 	cc.add_child(p)
-	return p
+	if hojd <= 0.0:
+		p.custom_minimum_size = Vector2(bredd, 0)
+		paneler.append([p, bredd, 0.0])
+		return p
+	var sc := ScrollContainer.new()
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	p.add_child(sc)
+	var inner := MarginContainer.new()
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inner.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.add_child(inner)
+	paneler.append([p, bredd, hojd])
+	_anpassa_panel(p, bredd, hojd)
+	return inner
+
+
+func _anpassa_panel(p: Control, bredd: float, hojd: float) -> void:
+	var yta := get_viewport().get_visible_rect().size if is_inside_tree() else Vector2(1600, 900)
+	p.custom_minimum_size = Vector2(minf(bredd, yta.x - 24.0), minf(hojd, yta.y - 24.0) if hojd > 0.0 else 0.0)
+
+
+func _anpassa_paneler() -> void:
+	for x in paneler:
+		if is_instance_valid(x[0]):
+			_anpassa_panel(x[0], x[1], x[2])
 
 
 func _gomt_allt() -> void:
@@ -281,17 +312,17 @@ func _bygg_huvudmeny() -> void:
 	v.offset_left = 110
 	v.offset_right = 700
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 14)
-	var titel := _lbl("Chicago", 150, true, GULD)
+	v.add_theme_constant_override("separation", 8 if mobil else 14)
+	var titel := _lbl("Chicago", 96 if mobil else 150, true, GULD)
 	titel.add_theme_constant_override("shadow_offset_x", 0)
 	titel.add_theme_constant_override("shadow_offset_y", 6)
 	titel.add_theme_constant_override("shadow_outline_size", 18)
 	titel.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	v.add_child(titel)
-	var under := _lbl("Svensk poker med stick · bara poäng, inga insatser", 26, false, Color(0.9, 0.86, 0.76))
+	var under := _lbl("Svensk poker med stick · bara poäng, inga insatser", 22 if mobil else 26, false, Color(0.9, 0.86, 0.76))
 	v.add_child(under)
 	var mell := Control.new()
-	mell.custom_minimum_size = Vector2(0, 30)
+	mell.custom_minimum_size = Vector2(0, 6 if mobil else 30)
 	v.add_child(mell)
 	var knappar := [["Snabbstart – du mot tre robotar", func() -> void: snabbstart.emit()], ["Nytt parti …", func() -> void: visa_installningar()], ["Skapa bord online …", func() -> void: visa_installningar_online()], ["Gå med i bord …", func() -> void: visa_ga_med("", get_parent().sparat_namn(), spelar_rader[0].figur)], ["Regler", func() -> void: visa_regler(null)]]
 	# på webben går det inte att avsluta programmet
@@ -299,7 +330,7 @@ func _bygg_huvudmeny() -> void:
 		knappar.append(["Avsluta", func() -> void: avsluta.emit()])
 	for k in knappar:
 		var b := _knapp(k[0], k[1], 28)
-		b.custom_minimum_size = Vector2(460, 56)
+		b.custom_minimum_size = Vector2(460, 52)
 		b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		v.add_child(b)
@@ -708,7 +739,7 @@ func visa_kastmeny(pos: Vector2, mal: int, namn: String) -> void:
 	if kastmeny == null:
 		kastmeny = PopupMenu.new()
 		kastmeny.theme = tema
-		kastmeny.add_theme_font_size_override("font_size", 22)
+		kastmeny.add_theme_font_size_override("font_size", 30 if mobil else 22)
 		kastmeny.id_pressed.connect(func(id: int) -> void:
 			var alla: Array = KASTA + HALSA
 			kasta.emit(kast_mal, alla[id][0]))
@@ -1396,7 +1427,7 @@ func _bygg_figurvaljare() -> void:
 	figur_vp = SubViewport.new()
 	figur_vp.own_world_3d = true
 	figur_vp.transparent_bg = false
-	figur_vp.msaa_3d = Viewport.MSAA_4X
+	figur_vp.msaa_3d = Viewport.MSAA_DISABLED if OS.has_feature("web") else Viewport.MSAA_4X
 	cont.add_child(figur_vp)
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
@@ -1473,6 +1504,13 @@ func _valj_figur(i: int) -> void:
 
 
 func _process(dt: float) -> void:
+	# stående telefon: be om att vrida till liggande
+	if vrid_vy:
+		var yta := get_viewport().get_visible_rect().size
+		var staende := mobil and yta.y > yta.x
+		if staende != vrid_vy.visible:
+			vrid_vy.visible = staende
+			vrid_vy.move_to_front()
 	if figur_vy and figur_vy.visible and figur_gubbe:
 		figur_gubbe.rotation.y += dt * 0.8
 		if fmod(figur_gubbe.tid, 4.0) < dt:
@@ -1508,7 +1546,7 @@ func _forhandsvisning(storlek: Vector2) -> Dictionary:
 	cont.custom_minimum_size = storlek
 	var vp := SubViewport.new()
 	vp.own_world_3d = true
-	vp.msaa_3d = Viewport.MSAA_4X
+	vp.msaa_3d = Viewport.MSAA_DISABLED if OS.has_feature("web") else Viewport.MSAA_4X
 	cont.add_child(vp)
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
@@ -1603,3 +1641,50 @@ func visa_bordinfo(d: Dictionary) -> void:
 		t += "\nPartiet har redan börjat."
 	ga_info.text = t
 	_ga_figur(ga_figur, 1)
+
+
+# ================================================================== mobil: vrid telefonen
+func _bygg_vrid() -> void:
+	vrid_vy = _helskarm(Color(0.02, 0.05, 0.035, 1.0))
+	var v := VBoxContainer.new()
+	vrid_vy.add_child(v)
+	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 30)
+	var ikon := VridIkon.new()
+	ikon.custom_minimum_size = Vector2(0, 260)
+	v.add_child(ikon)
+	var t := _lbl("Vrid telefonen", 64, true, GULD)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(t)
+	var u := _lbl("Chicago spelas liggande", 36, false, KRAM)
+	u.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(u)
+	vrid_vy.visible = false
+
+
+## En telefon som vrids ett kvarts varv, med en pil.
+class VridIkon extends Control:
+	var t := 0.0
+
+	func _process(dt: float) -> void:
+		t += dt
+		queue_redraw()
+
+	func _draw() -> void:
+		var m := size * 0.5
+		var v := clampf(sin(t * 2.0) * 1.4, -1.0, 1.0) * 0.5 + 0.5
+		var vinkel := -PI / 2.0 * smoothstep(0.0, 1.0, v)
+		draw_set_transform(m, vinkel)
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.1, 0.12, 0.11)
+		sb.border_color = Color(0.95, 0.77, 0.36)
+		sb.set_border_width_all(8)
+		sb.set_corner_radius_all(26)
+		draw_style_box(sb, Rect2(-70, -120, 140, 240))
+		draw_rect(Rect2(-50, -90, 100, 170), Color(0.07, 0.32, 0.18))
+		draw_circle(Vector2(0, 100), 9, Color(0.95, 0.77, 0.36))
+		draw_set_transform(m)
+		draw_arc(Vector2.ZERO, 165, -PI * 0.15, -PI * 0.6, 24, Color(0.97, 0.94, 0.87, 0.8), 8.0, true)
+		var spets := Vector2(cos(-PI * 0.6), sin(-PI * 0.6)) * 165
+		draw_colored_polygon(PackedVector2Array([spets + Vector2(-22, 6), spets + Vector2(14, -16), spets + Vector2(10, 24)]), Color(0.97, 0.94, 0.87, 0.8))

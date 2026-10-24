@@ -29,10 +29,10 @@ func _miljo() -> void:
 	env.ambient_light_energy = 0.4
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 1.05
-	env.ssao_enabled = true
+	env.ssao_enabled = not OS.has_feature("web")
 	env.ssao_radius = 0.6
 	env.ssao_intensity = 1.6
-	env.glow_enabled = true
+	env.glow_enabled = not OS.has_feature("web")
 	env.glow_intensity = 0.3
 	env.glow_bloom = 0.04
 	env.glow_hdr_threshold = 1.6

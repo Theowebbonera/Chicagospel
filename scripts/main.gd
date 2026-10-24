@@ -94,6 +94,10 @@ func _ready() -> void:
 		_kor_server(args)
 		return
 	demo = "--demo" in args
+	if Natverk.ar_mobil():
+		# telefon: större gränssnitt (knappar och text) och lägre 3D-upplösning för äldre telefoner
+		get_window().content_scale_factor = 1.5
+		get_viewport().scaling_3d_scale = 0.75
 	auto_man = "--automan" in args
 	for a in args:
 		if a.begins_with("--seed="):
@@ -159,6 +163,8 @@ func _ready() -> void:
 		kortlager.add_child(k)
 		kort.append(k)
 	_meny_dekor(true)
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.chicagoStartad = true;", true)
 	if demo:
 		var sp: Array = []
 		for i in 4:
@@ -527,26 +533,36 @@ func _process(dt: float) -> void:
 	kam.transform = _kam_tf(kam_vinkel)
 	kastsparr = maxf(kastsparr - dt, 0.0)
 	_hover_gubbar()
-	if (inmatning == "byte" or inmatning == "spela") and _halls(betraktare) and not auto_man:
-		var mp := get_viewport().get_mouse_position()
-		var o := kam.project_ray_origin(mp)
-		var r := kam.project_ray_normal(mp)
-		var bast := -1
-		var bt := 1e9
-		for c in vhand[betraktare]:
-			var t: float = kort[c].trraff(o, r)
-			if t > 0.0 and t < bt:
-				bt = t
-				bast = c
-		if bast != hover_id:
-			hover_id = bast
-			_layout_sats(betraktare, 0.1, 0.0)
+	if not auto_man:
+		_hover_kort(get_viewport().get_mouse_position())
+
+
+## Vilket kort i handen pekaren eller fingret är över.
+func _hover_kort(mp: Vector2) -> void:
+	if not ((inmatning == "byte" or inmatning == "spela") and _halls(betraktare)):
+		return
+	var o := kam.project_ray_origin(mp)
+	var r := kam.project_ray_normal(mp)
+	var bast := -1
+	var bt := 1e9
+	for c in vhand[betraktare]:
+		var t: float = kort[c].trraff(o, r)
+		if t > 0.0 and t < bt:
+			bt = t
+			bast = c
+	if bast != hover_id:
+		hover_id = bast
+		_layout_sats(betraktare, 0.1, 0.0)
 
 
 func _unhandled_input(e: InputEvent) -> void:
 	if kam == null:
 		return
 	if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+		# vid touch kommer positionen samtidigt som trycket: räkna om vad som träffas just där
+		if not auto_man:
+			_hover_kort(e.position)
+			_hover_gubbar(e.position)
 		if hover_id >= 0:
 			_klicka(hover_id)
 		elif hover_gubbe >= 0:
@@ -1050,10 +1066,10 @@ func _gest(p: int) -> void:
 
 # ================================================================== kasta vattenballong, tomat, ros
 ## Musen över en figur ger handpekare och möjlighet att kasta. Påverkar inte spelet och avslöjar inga kort.
-func _hover_gubbar() -> void:
+func _hover_gubbar(punkt = null) -> void:
 	var ny := -1
 	if not meny_lage and not gubbar.is_empty() and not ui.ar_pausad and ui.hud.visible and hover_id < 0:
-		var mp := get_viewport().get_mouse_position()
+		var mp: Vector2 = punkt if punkt != null else get_viewport().get_mouse_position()
 		var o := kam.project_ray_origin(mp)
 		var r := kam.project_ray_normal(mp)
 		var bt := 1e9

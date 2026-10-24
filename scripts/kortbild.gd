@@ -13,6 +13,7 @@ signal klar
 var framsidor: Array = []  # ImageTexture per kort 0–51
 var baksidor: Array = []  # [röd, blå]
 var fyrfarg := false
+var skala := 1.0
 
 
 func bygg(font: Font) -> void:
@@ -25,17 +26,20 @@ func bygg(font: Font) -> void:
 		klar.emit()
 		return
 	var vp := SubViewport.new()
-	vp.size = Vector2i(B * KOL, HJ * 4)
+	# på webben ritas leken i 70 % storlek: mindre minne på mobiler, fortfarande skarpt
+	skala = 0.7 if OS.has_feature("web") else 1.0
+	vp.size = Vector2i(int(B * KOL * skala), int(HJ * 4 * skala))
 	vp.transparent_bg = true
 	vp.disable_3d = true
-	vp.msaa_2d = Viewport.MSAA_8X
+	vp.msaa_2d = Viewport.MSAA_DISABLED if OS.has_feature("web") else Viewport.MSAA_8X
 	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	var r := Ritare.new()
 	r.font = font
 	r.fyrfarg = fyrfarg
-	r.size = Vector2(vp.size)
+	r.size = Vector2(B * KOL, HJ * 4)
 	vp.add_child(r)
 	add_child(vp)
+	vp.canvas_transform = Transform2D().scaled(Vector2(skala, skala))
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 	var img: Image = vp.get_texture().get_image() if vp.get_texture() else null
@@ -61,7 +65,9 @@ func _platshallare() -> void:
 
 
 func _bit(img: Image, kol: int, rad: int) -> ImageTexture:
-	var del := img.get_region(Rect2i(kol * B, rad * HJ, B, HJ))
+	var bb := int(B * skala)
+	var hh := int(HJ * skala)
+	var del := img.get_region(Rect2i(kol * bb, rad * hh, bb, hh))
 	del.fix_alpha_edges()
 	del.generate_mipmaps()
 	return ImageTexture.create_from_image(del)

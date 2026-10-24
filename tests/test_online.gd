@@ -207,13 +207,13 @@ func _init() -> void:
 	root.add_child(server)
 	_ok(server.starta(PORT) == OK, "servern startar")
 	var r := Regler.new()
-	r.malpoang = 20
+	r.malpoang = 60
 	var anna := _bot("Anna")
 	anna.k.skicka({"t": "skapa", "namn": "Anna", "antal": 4, "regler": r.till_dict(), "figur": 3})
 	await _vanta_pa(func() -> bool: return anna.kod != "", 5.0, "Anna får en bordskod")
 	print("bord skapat: ", anna.kod)
 	_ok(anna.kod.length() == 4 and anna.plats == 0, "kod med fyra tecken och värden på plats 0")
-	_ok(int(anna.regler_d.get("malpoang", 0)) == 20, "lobbyn visar bordets regler")
+	_ok(int(anna.regler_d.get("malpoang", 0)) == 60, "lobbyn visar bordets regler")
 	# den som ska gå med får först bordets information: regler i läsläge och tagna figurer
 	var titt := _bot("Titt")
 	var info := {}
@@ -222,7 +222,7 @@ func _init() -> void:
 			info.merge(d, true))
 	titt.k.skicka({"t": "bordinfo", "kod": anna.kod})
 	await _vanta_pa(func() -> bool: return not info.is_empty(), 3.0, "bordinfo")
-	_ok(info.get("finns", false) and info.varde_namn == "Anna" and int(info.platser[0].figur) == 3 and int(info.regler.malpoang) == 20, "bordinfo med värd, regler och tagen figur")
+	_ok(info.get("finns", false) and info.varde_namn == "Anna" and int(info.platser[0].figur) == 3 and int(info.regler.malpoang) == 60, "bordinfo med värd, regler och tagen figur")
 	# samma figur som Anna går inte
 	var dubbel := _bot("Dubbel")
 	dubbel.k.skicka({"t": "ga_med", "kod": anna.kod, "namn": "Dubbel", "figur": 3})
@@ -245,11 +245,11 @@ func _init() -> void:
 	cia.k.skicka({"t": "fyll"})
 	cia.k.skicka({"t": "figur", "figur": 5})
 	await _vanta_pa(func() -> bool: return cia.felmeddelanden.size() >= 4, 3.0, "icke-värd avvisas")
-	_ok(server.bord[anna.kod].platser[3].typ == "tom" and server.bord[anna.kod].regler.malpoang == 20, "icke-värd ändrade inget")
+	_ok(server.bord[anna.kod].platser[3].typ == "tom" and server.bord[anna.kod].regler.malpoang == 60, "icke-värd ändrade inget")
 	_ok(server.bord[anna.kod].platser[2].figur == 7, "Cia fick inte ta Bos figur")
 	# värden kan ändra reglerna före start
 	var r2 := Regler.new()
-	r2.malpoang = 20
+	r2.malpoang = 60
 	r2.kopstopp = 30
 	anna.k.skicka({"t": "regler", "regler": r2.till_dict()})
 	await _vanta_pa(func() -> bool: return server.bord[anna.kod].regler.kopstopp == 30, 3.0, "värden ändrar regler")

@@ -23,6 +23,15 @@ static func robotsvar(typ: String, r: RandomNumberGenerator) -> String:
 	return ["vattenballong", "tomat", "tarta", "snoboll", "flygplan"][r.randi_range(0, 4)]
 
 
+## Körs vi i en mobilwebbläsare (eller på mobil)?
+static func ar_mobil() -> bool:
+	if OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("mobile"):
+		return true
+	if OS.has_feature("web"):
+		return bool(JavaScriptBridge.eval("/iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent)", true))
+	return false
+
+
 ## Vilken server klienten ska ansluta till.
 static func server_url() -> String:
 	for a in OS.get_cmdline_user_args():
