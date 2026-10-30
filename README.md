@@ -1,14 +1,15 @@
 # Chicago (Godot 4.7: dator, webb och online)
 
-Svensk Chicago, pokervarianten med byten och stick, vid ett 3D-kortbord med tecknade figurer på platserna. Man kan spela mot robotar, turas om vid samma dator eller spela online med vänner via en delbar länk. Det går bara om poäng, utan insatser. Allt byggs i kod: kortleken, bordet, figurerna, ljuset och ljuden.
+Svensk Chicago, pokervarianten med byten och stick, vid ett 3D-kortbord med tecknade figurer på platserna. Spelet är bara online: du skapar ett bord och delar länken, och dina vänner väljer sin figur och hamnar i lobbyn. Det finns inga robotar och inget lokalt spel. Det går bara om poäng, utan insatser. Bordet, figurerna, ljuset och ljuden byggs i kod. De klädda korten är Byron Knolls Vector Playing Cards (public domain), med spelets egna svenska hörnindex (Kn, D, K, E).
 
 - **Spela:** `spela.bat` · **Editorn:** `redigera.bat` · **Tester:** `testa.bat`
 - **Färdiga byggen:** `build/windows/Chicago.exe` (en fil) och `build/web/` (webbversionen).
+- **Handen:** de egna korten ligger bredvid varandra så att hela kortet syns, och handen krymps och centreras så att den får plats mellan poängtavlan och åtgärdsrutan.
 - **Styrning:** klicka på kort för att välja vilka som ska bytas och tryck **Byt**. I sticken klickar du på kortet du vill spela, och otillåtna kort är mörkare. Tangenterna 1–5 väljer kort, Enter bekräftar och Esc pausar.
 - **Kasta och hälsa:** klicka på en annan spelares figur eller namn. Knappen **6-7** uppe till höger gör 6-7 själv.
 
 ## Theos husregler (standard)
-Allt går att ändra under **Nytt parti** eller **Skapa bord online**. Knappen **Klassiska regler** ger de vanligaste svenska reglerna i stället.
+Allt går att ändra under **Skapa bord**. Knappen **Klassiska regler** ger de vanligaste svenska reglerna i stället.
 
 | Regel | Standard |
 |---|---|
@@ -29,13 +30,11 @@ Allt går att ändra under **Nytt parti** eller **Skapa bord online**. Knappen *
 **Eget val:** färgstege har 10 poäng som standard, så att den är värd mer än fyrtalet (8). Det är också värdet i Theos första poängtabell.
 
 ## Dolda kort
-- Det enda som syns öppet är **kortet en spelare lägger i sticket** och **den egna handen för den människa som har turen**. Mot robotar är det den enda människans hand.
+- Det enda som syns öppet är **kortet en spelare lägger i sticket** och **din egen hand**.
 - **Vid poängsättningen vänds inga kort.** Spelet säger bara till exempel "Anna: färg, 5 poäng", aldrig färger eller valörer. Lika händer avgörs i hemlighet.
-- Robotarnas händer, slängda kort, talongen och tagna stick ligger alltid med baksidan upp.
+- Andras händer, slängda kort, talongen och tagna stick ligger alltid med baksidan upp.
 - Under Chicago-frågan visas inte vems tur det är, eftersom det skulle avslöja vem som har rätt att ropa. Köpstopp och Chicago-rätt får man bara veta om sig själv. För andra syns bara att de "står över".
-- Vid flera människor på samma dator visas skärmen **"Lämna över till <namn>"** mellan turerna, och handen vänds först när nästa spelare klickar.
-- Robotarna och onlineklienterna får bara spelarens egen vy (`motor.vy(p)`). Ingen kan fuska.
-- Undantaget är demoläget med fyra robotar, där korten får synas.
+- Servern skickar bara spelarens egen vy (`motor.vy(p)`). Andras kort når aldrig din dator, så ingen kan fuska.
 
 ## Figurer, kast och 6-7
 - **14 figurer** (`scripts/figurer.gd`, byggs av `scripts/gubbe.gd`). De skiljer sig i:
@@ -47,29 +46,29 @@ Allt går att ändra under **Nytt parti** eller **Skapa bord online**. Knappen *
   - accessoarer: hatt, keps, glasögon, solglasögon, skägg, mustasch, hörlurar, fluga, mössa, krona, piratlapp, kockmössa, cowboyhatt
 
   Extrafigurerna är **Robot R7, Kapten Jack (pirat), Kocken, Cowboy-Kalle, Hunden Doris och Katten Måns**.
-- Varje plats väljer figur i **Nytt parti** med en snurrande förhandsvisning och knapparna Föregående och Nästa. Online väljer man i lobbyn. Robotar och "slumpad" får en figur som inte redan är vald. Theos val sparas i `user://chicago.cfg`, och online skickas valet via servern.
+- Värden väljer figur under **Skapa bord**, och den som går med väljer på figurskärmen (snurrande förhandsvisning, Föregående och Nästa). Figuren kan bytas i lobbyn. Den som inte har valt får en figur som inte redan är tagen. Valet sparas i `user://chicago.cfg` och skickas via servern.
 - Figurerna andas, tittar mot den som har turen, gestikulerar när de spelar, jublar vid poäng och sitter bakom bordskanten så att de inte skymmer korten.
 - **Kastmenyn**
   - Kasta: vattenballong, tomat, gräddtårta, snöboll, pappersflygplan.
   - Hälsa: ros, fingerkyss, krona, konfetti, 6-7.
 
-  Det finns 3 sekunders spärrtid. Robotar kastar ibland tillbaka och gör ibland 6-7 när de tar ett stick eller poäng. Det stängs av med kryssrutan "Robotar kastar tillbaka och busar".
+  Det finns 3 sekunders spärrtid.
 - **6-7:** figuren håller båda handflatorna uppåt och gungar händerna i otakt med en pratbubbla och ett syntetiserat ljud. Inget av detta påverkar spelet eller visar kort.
 
 ## Spela online
-1. **Värden** väljer **Skapa bord online …**, skriver sitt namn och väljer antal platser, regler och figur, och trycker **Skapa bord**. Värden får en kod (till exempel `K7Q2`) och en lobby. Bara värden ställer in regler, antal platser och robotar, och bara värden ser och kan trycka **Starta**.
-2. **Kopiera länk** och skicka den. Kompisarna öppnar `https://<din-sida>/?bord=K7Q2`. Efter "Klicka för att börja" kommer de direkt till en enkel skärm med:
+1. **Värden** väljer **Skapa bord …**, skriver sitt namn, väljer figur och regler och trycker **Skapa bord**. Värden får en kod (till exempel `K7Q2`) och en lobby. Bara värden ställer in regler och ser **Starta**.
+2. **Kopiera länk** och skicka den. Kompisarna öppnar `https://<din-sida>/?bord=K7Q2` och kommer **direkt** till figurskärmen, utan startskärm:
    - figurväljaren (snurrande förhandsvisning, Föregående och Nästa). Figurer som redan är tagna vid bordet visas som upptagna och hoppas över.
    - ett namnfält, förifyllt med figurens namn
-   - partiets regler i läsläge, till exempel "Mål 52 med Chicago · Köpstopp 41 · Chicago från 15"
-   - en stor knapp **Gå med**
+   - partiets regler i läsläge
+   - en stor knapp **Gå med**, som tar dem till lobbyn
 
-   Det finns inga regelinställningar och inga knappar för robotar eller start. **Gå med i bord …** i menyn ger samma skärm med ett fält för koden.
-3. I lobbyn syns alla platser, figurer och namn. Den som gått med ser "Väntar på att <värd> startar partiet …". Värden lägger robotar (lätt, medel eller svår) på tomma platser eller trycker **Fyll tomma platser med robotar**, och sedan **Starta**.
-4. Tappar någon anslutningen ansluter klienten själv igen med en token som är sparad lokalt (`user://chicago_online.cfg`). Samma länk fungerar också. Medan spelaren är borta gör en robot dragen efter 6 sekunder.
+   **Gå med i bord …** i menyn ger samma skärm med ett fält för koden.
+3. I lobbyn syns de som har gått med, med figur och namn, och hur många platser som är kvar (högst 6). Den som har gått med ser "Väntar på att <värd> startar partiet …". Värden trycker **Starta** när minst två sitter vid bordet. Lediga platser tas bort vid start, och den som har tappat anslutningen i lobbyn är inte med.
+4. Tappar någon anslutningen mitt i partiet ansluter klienten själv igen med en token som är sparad lokalt (`user://chicago_online.cfg`). Samma länk fungerar också. Är spelaren borta längre än 45 sekunder när det är dennes tur gör servern ett enkelt drag (inget byte, ingen Chicago, lägsta tillåtna kortet), så att partiet inte står still.
 5. Bord utan anslutna människor städas bort efter 10 minuter.
 
-Servern (`scripts/server.gd`) är auktoritativ med `motor.gd` som enda sanning. Den blandar, ger, avgör stick och poäng och låter robotar spela. Varje klient får bara sin egen hand och det offentliga. Andras kort skickas aldrig: i givar och byten kommer de som `-1` (`scripts/natverk.gd`, `filtrera`/`tillstand`). Klienten visar dem med anonyma kortnoder som byter identitet osynligt när ett kort spelas ut. Allt valideras på servern: otillåtna drag, drag i fel tur och för tidiga kast. Bara värdens anslutning, alltså värdens token, får ändra regler, lägga till eller ta bort robotar, fylla platser och starta. Två spelare får inte ha samma figur, och robotar får lediga figurer. Att gå med i ett pågående parti kräver token. Tappar värden anslutningen behålls värdskapet via token vid återanslutning. Före anslutning kan klienten fråga om ett bord (`bordinfo`) och får regler, värd och tagna figurer. Protokollet är JSON över WebSocket.
+Servern (`scripts/server.gd`) är auktoritativ med `motor.gd` som enda sanning. Den blandar, ger och avgör stick och poäng. Varje klient får bara sin egen hand och det offentliga. Andras kort skickas aldrig: i givar och byten kommer de som `-1` (`scripts/natverk.gd`, `filtrera`/`tillstand`). Klienten visar dem med anonyma kortnoder som byter identitet osynligt när ett kort spelas ut. Allt valideras på servern: otillåtna drag, drag i fel tur och för tidiga kast. Bara värdens anslutning, alltså värdens token, får ändra regler och starta. Två spelare får inte ha samma figur. Att gå med i ett pågående parti kräver token. Tappar värden anslutningen behålls värdskapet via token vid återanslutning. Före anslutning kan klienten fråga om ett bord (`bordinfo`) och får regler, värd och tagna figurer. Vid start packas platserna ihop, och var och en får sin plats på nytt (`valkommen`). Protokollet är JSON över WebSocket.
 
 **Serveradress:** den sätts i `scripts/natverk.gd`.
 - `SERVER_LOKAL` (`ws://localhost:9080`) används när spelet körs från editorn och när webbsidan körs över http, till exempel lokalt.
@@ -79,10 +78,12 @@ Servern (`scripts/server.gd`) är auktoritativ med `motor.gd` som enda sanning. 
 
 Lokal server: `Godot_v4.7.2-stable_win64_console.exe --headless --path . -- --server --port=9080`. Porten kan också sättas med miljövariabeln `PORT`.
 
+**Klient och server hör ihop:** servern och webbspelet måste uppdateras samtidigt (Render och GitHub Pages), eftersom en äldre server kräver att alla platser är fyllda innan start.
+
 ## Webbversion
 - Exportprofilen **Web** körs utan trådar (nothreads) till `build/web/`, och **Windows** exporteras till `build/windows/Chicago.exe`. Båda finns i `export_presets.cfg`.
 - Webben använder renderaren **Compatibility** via en webböverstyrning (`rendering_method.web`). Datorversionen behåller Forward+.
-- Webben börjar med skärmen **"Klicka för att börja"**, eftersom ljud kräver ett klick. Avsluta-knappen är dold.
+- Webben börjar med skärmen **"Klicka för att börja"**, eftersom ljud kräver ett klick. Med en `?bord=`-länk visas figurskärmen direkt i stället, och klicket på **Gå med** startar ljudet. Avsluta-knappen är dold.
 - Exportera igen: `Godot_v4.7.2-stable_win64_console.exe --headless --path . --export-release "Web" build/web/index.html`.
 - Prova lokalt: `py -m http.server 8060 --directory build/web` och öppna `http://localhost:8060/`. Starta också den lokala servern för att spela online.
 - **Skillnader i Compatibility** (`bord.gd` och andra skript):
@@ -135,22 +136,15 @@ Du skapar kontona själv. Inget är uppladdat härifrån.
 1. Zippa innehållet i `build/web/` och ladda upp det som ett HTML-spel med inställningen "This file will be played in the browser".
 2. På itch körs spelet i en iframe på en annan adress, så `?bord=`-länken når inte fram. Använd **koden** och "Gå med i bord" där.
 
-## Robotar
-- **Lätt:** tumregler och ibland misstag.
-- **Medel:** provar alla 32 sätt att behålla kort mot kort den inte har sett, och sparar höga kort till sista sticket.
-- **Svår:** som medel, men väger handen efter chansen att vara bäst, och simulerar sticken mot slumpade fördelningar av okända kort.
-- Robotarna följer husreglerna: de byter inte vid köpstopp, ropar Chicago bara när de får (minst 15 och inte redan tagen) och kan inte se andras kort.
-
 ## Filer
-- **Regler och robotar**
+- **Regler**
   - `scripts/motor.gd`: regelmotorn (husreglerna, den löpande totalen och redovisning efter sticket).
   - `scripts/regler.gd`: alla inställningar.
   - `scripts/handvarde.gd`, `scripts/kort.gd`: handvärdering och kortleken.
-  - `scripts/robot.gd`: robotarna.
 - **Grafik och gränssnitt**
-  - `scripts/main.gd`: spelflödet lokalt och online, animeringar och kast.
+  - `scripts/main.gd`: spelflödet online, handen, animeringar och kast.
   - `scripts/ui.gd`: menyer, lobby, figurväljare och HUD.
-  - `scripts/bord.gd`, `scripts/kortbild.gd`, `scripts/kort3d.gd`: bordet och korten.
+  - `scripts/bord.gd`, `scripts/kortbild.gd`, `scripts/kort3d.gd`: bordet och korten. De klädda korten läses ur `assets/kort/` (färg_valör.png).
   - `scripts/gubbe.gd`, `scripts/figurer.gd`: figurerna.
   - `scripts/ljud.gd`: ljuden.
 - **Online**
@@ -162,12 +156,13 @@ Du skapar kontona själv. Inget är uppladdat härifrån.
   - `Dockerfile`, `render.yaml`, `.dockerignore`.
 - **Verktyg**
   - `verktyg/rita_kort.gd`: kortleken som bild.
+  - `verktyg/rasta_kladda.gd`: rastrerar de klädda korten ur [Vector Playing Cards](https://github.com/hayeah/playing-cards-assets) (`svg-cards/`) till `assets/kort/`. Bara bildramen tas med.
   - `verktyg/figurgalleri.gd`: alla figurer i en bild.
-- Typsnittet är Fredoka under SIL OFL (`assets/OFL.txt`).
+- Typsnittet är Fredoka under SIL OFL (`assets/OFL.txt`). Bilderna på de klädda korten är Byron Knolls Vector Playing Cards, public domain.
 
 ## Tester
-`testa.bat` kör alla sju sviterna headless.
-- `test_regler`, 435 kontroller:
+`testa.bat` kör alla fyra sviterna headless.
+- `test_regler`, 433 kontroller:
   - handvärdering, bekänna färg, stick och tvåan
   - de klassiska reglerna
   - husreglerna:
@@ -181,43 +176,29 @@ Du skapar kontona själv. Inget är uppladdat härifrån.
     - Chicago en gång per parti, även efter nollställning, och tillåtet igen efter misslyckad
     - poäng efter given, byte 1 och byte 2 visas direkt, och bara stick-rundan efter sticket
     - 52 utan Chicago ger ingen vinst, en Chicago som tar spelaren över 52 vinner, och den som tagit Chicago och sedan nollställts vinner vid 52. Utan regeln vinner 52 direkt, och högst total vinner när flera når målet.
-    - robotar följer reglerna
   - sparfiler
-  - att robotarna inte fuskar
-- `test_robotar`: 28 hela partier med 2–6 spelare och olika regler, plus nivåjämförelse. Säkerhetstaket är 1500 givar per parti. Med husregeln "Chicago krävs för vinst" blir partier med 5–6 spelare långa, upp till cirka 400 givar mellan robotar, men alla tar slut.
+  - att en spelares vy inte innehåller andras händer, talongen eller slängda kort
 - `test_figurer`: alla 14 figurer byggs och provas med alla reaktioner, kast och 6-7, och slumpade figurer blir unika.
-- `test_dolda_kort`: 3D-scenen, både mot robotar och med två människor på samma dator, med alla kast igång. Testet kontrollerar i varje bildruta att inga otillåtna kort syns, och att poängtavlan redan under bytena visar givens poäng.
-- `test_scen`: ett helt robotparti i 3D, där alla tio kast och hälsningar och den egna 6-7 provas.
-- `test_online`: en server och tre klienter.
-  - En klient frågar om bordet (`bordinfo`), en dubblerad figur avvisas, och en icke-värd avvisas vid robottillägg, regeländring, fyllning, start och byte till en tagen figur. Värden ändrar regler och startar efter att två har gått med.
-  - De skapar ett bord, går med via kod och lägger till en robot.
-  - Testet kontrollerar figurerna och att otillåtna drag, drag i fel tur, för tidiga kast, fel startare och att gå med i ett pågående parti avvisas.
-  - Ett helt parti spelas, med frånkoppling och återkomst via token.
-  - Alla cirka 800 meddelanden inspekteras mot serverns facit, och ingen klient får andras kort.
-  - Bordet städas bort.
-  - Servern startas också som egen process med `-- --server`.
-- `test_online_scen`: hela spelet som onlineklient mot en lokal server, med en gäst och en robot.
-  - Hela partiet spelas med 3D-grafiken, och det kontrolleras att inga dolda kort syns.
+- `test_online`: en server och tre klienter (Anna, Bo, Cia).
+  - Värden kan inte starta ensam. En klient frågar om bordet (`bordinfo`), en dubblerad figur avvisas, och en icke-värd avvisas vid regeländring, start och byte till en tagen figur. Gamla robotmeddelanden (`plats`, `fyll`) avvisas.
+  - Värden startar med de tre som har gått med: lediga platser tas bort, och alla behåller plats och figur.
+  - Testet kontrollerar att otillåtna drag, drag i fel tur, för tidiga kast och att gå med i ett pågående parti avvisas.
+  - Ett helt parti spelas, med frånkoppling (servern gör enkla drag) och återkomst via token.
+  - Alla meddelanden inspekteras mot serverns facit, och ingen klient får andras kort.
+  - Bordet städas bort, och servern startas också som egen process med `-- --server`.
+- `test_online_scen`: hela spelet som onlineklient mot en lokal server.
+  - Anna skapar bordet. Theo går med som via en delad länk: figurskärmen utan kodfält, Annas figur hoppas över, och **Gå med** leder till lobbyn med "Väntar på att Anna startar" och utan Starta-knapp.
+  - Hela partiet spelas med 3D-grafiken, och i varje bildruta kontrolleras att inga dolda kort syns.
   - Anslutningen bryts mitt i, och klienten ansluter igen automatiskt och bygger upp bordet.
   - Poängen stämmer med serverns.
-- Webben provades i Chrome headless med Puppeteer (utanför projektet): startskärmen, menyn, `?bord=KOD`, gå med, lobbyn och spelet mot en lokal server, utan konsolfel.
+- Testerna spelar med en enkel spelarlogik i `tests/testspelare.gd` (den gamla robotlogiken). Den ingår inte i spelet.
 
-## Demo och inspelning
-```
-Godot_v4.7.2-stable_win64_console.exe --path . --position 4000,4000 --write-movie ut/f.png --fixed-fps 10 --quit-after 600 -- --demo --seed=3
-```
-- `--demo`: fyra robotar med öppna kort.
-- `--automan`: du-perspektivet, där en automatisk "människa" spelar.
-- `--hotseat`: två människor på samma dator.
-- `--kasta`: kastar alla sorter i tur och ordning.
-- `--kastmeny`: öppnar kastmenyn.
-- `--seed=N`, `--fart=X`, `--mal=N`: frö, hastighet och målpoäng.
-- `--installningar`, `--figurval`, `--regler`, `--lobbydemo`: öppnar skärmarna direkt.
+## Inspelning
 - `--bord=KOD`: gå med (datorversionen).
 - `--server-url=ws://...`: annan server.
+- `--seed=N`, `--fart=X`: frö och hastighet.
 
 ## Kvar att göra
 - Servern på Render och webbspelet på GitHub Pages ska läggas upp (steg ovan), och `SERVER_PRODUKTION` ska sättas till den riktiga adressen.
 - Bord ligger bara i minnet. Om servern startas om eller somnar försvinner pågående partier.
 - Ingen egen avatar i hörnet. Den egna 6-7 visas i 2D.
-- Robotarna drar ingen slutsats av hur många kort andra byter.

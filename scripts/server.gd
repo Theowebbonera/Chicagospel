@@ -1,18 +1,19 @@
 extends Node
 ## Auktoritativ server för onlinespel. Kör: Godot --headless --path . -- --server --port=9080
-## Regelmotorn (motor.gd) är enda sanningen: servern blandar, ger, avgör stick och poäng och låter robotar spela.
+## Regelmotorn (motor.gd) är enda sanningen: servern blandar, ger och avgör stick och poäng.
+## Bara människor spelar (inga robotar sedan 2026-10-30). Värden startar när minst två har gått med.
 ## Varje klient får bara sin egen hand och det offentliga (natverk.filtrera / natverk.tillstand).
 ## Protokoll: JSON-text över WebSocket. Allt från klienter valideras.
 
 const Motor := preload("res://scripts/motor.gd")
 const Regler := preload("res://scripts/regler.gd")
-const Robot := preload("res://scripts/robot.gd")
 const Natverk := preload("res://scripts/natverk.gd")
 const Figurer := preload("res://scripts/figurer.gd")
 
 const KASTSPARR := 3.0
 const STADA_EFTER := 600.0  # sekunder utan anslutna människor innan bordet tas bort
-const FRANVARO_ROBOT := 6.0  # sekunder innan en robot spelar åt en frånkopplad spelare
+const MAX_PLATSER := 6
+const FRANVARO_AUTO := 45.0  # sekunder innan servern gör ett enkelt drag åt en frånkopplad spelare
 
 var tcp := TCPServer.new()
 var anslutningar := {}  # id -> {ws, bord, plats, tid}
@@ -21,8 +22,8 @@ var bord := {}  # kod -> Dictionary
 var rng := RandomNumberGenerator.new()
 var tid := 0.0
 var stada_efter := STADA_EFTER
-var franvaro_robot := FRANVARO_ROBOT
-var tempo := 1.0  # < 1 snabbar upp robotarnas pauser (tester)
+var franvaro_auto := FRANVARO_AUTO
+var tempo := 1.0  # < 1 snabbar upp pauserna mellan händelser (tester)
 var logga_ut := true
 
 
@@ -96,16 +97,6 @@ func _ta_emot(id: int, text: String) -> void:
 			var b: Dictionary = bord[a.bord]
 			var p: int = a.plats
 			match str(d.t):
-				"plats":
-					_andra_plats(id, b, p, d)
-				"fyll":
-					if p != b.varde or b.startad:
-						_fel(id, "Bara värden kan fylla platser före start")
-						return
-					for q in b.platser.size():
-						if b.platser[q].typ == "tom":
-							_gor_robot(b, q, 1)
-					_skicka_lobby(b)
 				"starta":
 					_starta_parti(id, b, p)
 				"figur":
@@ -160,7 +151,7 @@ func _skapa(id: int, d: Dictionary) -> void:
 	if anslutningar[id].bord != "":
 		_fel(id, "Du sitter redan vid ett bord")
 		return
-	var antal := clampi(int(d.get("antal", 4)), 2, 6)
+	var antal := clampi(int(d.get("antal", MAX_PLATSER)), 2, MAX_PLATSER)
 	var r := Regler.new()
 	if d.get("regler") is Dictionary:
 		r.fran_dict(d.regler)
@@ -168,9 +159,9 @@ func _skapa(id: int, d: Dictionary) -> void:
 	var kod := _ny_kod()
 	var platser: Array = []
 	for i in antal:
-		platser.append({"namn": "", "typ": "tom", "niva": 1, "token": "", "id": -1, "borta": 0.0, "figur": -1})
+		platser.append({"namn": "", "typ": "tom", "token": "", "id": -1, "borta": 0.0, "figur": -1})
 	var b := {"kod": kod, "regler": r, "platser": platser, "varde": 0, "startad": false, "motor": null,
-		"vanta": 0.0, "tomt": 0.0, "kast": {}, "kastko": [], "tagna": [], "robotlek": bool(d.get("robotlek", true))}
+		"vanta": 0.0, "tomt": 0.0, "kast": {}, "tagna": []}
 	bord[kod] = b
 	b.platser[0].figur = _figur(d)
 	_satt_ner(id, b, 0, _rent_namn(d.get("namn", "")))
@@ -249,55 +240,16 @@ func _figur_upptagen(b: Dictionary, f: int, utom: int) -> bool:
 	return false
 
 
-## Robot på en plats, med en figur som ingen annan har.
-func _gor_robot(b: Dictionary, q: int, niva: int) -> void:
-	b.platser[q].typ = "robot"
-	b.platser[q].niva = clampi(niva, 0, 2)
-	var valda: Array = []
-	for i in b.platser.size():
-		var x: Dictionary = b.platser[i]
-		valda.append(x.figur if x.typ != "tom" and i != q else -1)
-	var f: int = b.platser[q].figur
-	if f < 0 or _figur_upptagen(b, f, q):
-		var fordelat := Figurer.fordela(valda, rng)
-		f = fordelat[q]
-	b.platser[q].figur = f
-	b.platser[q].namn = "%s (robot)" % Figurer.namn(f)
-
-
 func _figur(d: Dictionary) -> int:
 	var f := int(d.get("figur", -1))
 	return f if f >= 0 and f < Figurer.antal() else -1
-
-
-func _robotnamn(b: Dictionary, p: int) -> String:
-	var namn := ["Astrid", "Bertil", "Cecilia", "Doris", "Erik", "Frida"]
-	return "%s (robot)" % namn[p % namn.size()]
-
-
-func _andra_plats(id: int, b: Dictionary, p: int, d: Dictionary) -> void:
-	if p != b.varde or b.startad:
-		_fel(id, "Bara värden kan ändra platser före start")
-		return
-	var q := int(d.get("plats", -1))
-	if q < 0 or q >= b.platser.size() or b.platser[q].typ == "manniska":
-		_fel(id, "Platsen går inte att ändra")
-		return
-	var typ := str(d.get("typ", "tom"))
-	if typ == "robot":
-		_gor_robot(b, q, int(d.get("niva", 1)))
-	else:
-		b.platser[q].typ = "tom"
-		b.platser[q].namn = ""
-		b.platser[q].figur = -1
-	_skicka_lobby(b)
 
 
 func _lobby(b: Dictionary) -> Dictionary:
 	var pl: Array = []
 	for p in b.platser.size():
 		var x: Dictionary = b.platser[p]
-		pl.append({"namn": x.namn, "typ": x.typ, "niva": x.niva, "figur": x.figur, "ansluten": x.typ != "manniska" or (x.id >= 0 and anslutningar.has(x.id))})
+		pl.append({"namn": x.namn, "typ": x.typ, "figur": x.figur, "ansluten": x.typ != "manniska" or (x.id >= 0 and anslutningar.has(x.id))})
 	return {"t": "lobby", "kod": b.kod, "platser": pl, "regler": b.regler.till_dict(), "startad": b.startad, "varde": b.varde}
 
 
@@ -315,17 +267,24 @@ func _starta_parti(id: int, b: Dictionary, p: int) -> void:
 	if b.startad and b.motor != null and b.motor.fas != Motor.Fas.SLUT:
 		_fel(id, "Partiet pågår redan")
 		return
-	for pl in b.platser:
-		if pl.typ == "tom":
-			_fel(id, "Fyll alla platser (bjud in fler eller lägg till robotar)")
-			return
+	# bara de som har gått med och är anslutna spelar; lediga platser tas bort
+	var kvar: Array = []
+	for q in b.platser.size():
+		var pl: Dictionary = b.platser[q]
+		if pl.typ == "manniska" and (q == b.varde or (pl.id >= 0 and anslutningar.has(pl.id))):
+			kvar.append(pl)
+	if kvar.size() < 2:
+		_fel(id, "Minst två spelare behövs. Dela länken med dina vänner.")
+		return
+	if kvar.size() != b.platser.size():
+		_packa_platser(b, kvar)
 	var namn: Array = []
 	for pl in b.platser:
 		namn.append(pl.namn)
-	# robotar får figurer som inte redan är valda
+	# den som inte valt figur får en som inte redan är vald
 	var valda: Array = []
 	for pl in b.platser:
-		valda.append(pl.figur if pl.typ == "manniska" else -1)
+		valda.append(pl.figur)
 	var fig := Figurer.fordela(valda, rng)
 	for q in b.platser.size():
 		b.platser[q].figur = fig[q]
@@ -337,6 +296,22 @@ func _starta_parti(id: int, b: Dictionary, p: int) -> void:
 	b.vanta = 0.0
 	_skicka_lobby(b)
 	_sanda_steg(b)
+
+
+## Platserna blir bara de som spelar, i samma ordning. Var och en får sin nya plats (och värden sin).
+func _packa_platser(b: Dictionary, kvar: Array) -> void:
+	var vard: Dictionary = b.platser[b.varde]
+	for pl in b.platser:
+		if not pl in kvar and pl.id >= 0 and anslutningar.has(pl.id):
+			anslutningar[pl.id].bord = ""
+			anslutningar[pl.id].plats = -1
+	b.platser = kvar
+	b.varde = kvar.find(vard)
+	for q in kvar.size():
+		var pl: Dictionary = kvar[q]
+		if pl.id >= 0 and anslutningar.has(pl.id):
+			anslutningar[pl.id].plats = q
+			_skicka(pl.id, {"t": "valkommen", "kod": b.kod, "plats": q, "token": pl.token, "varde": q == b.varde})
 
 
 ## Skickar motorns nya händelser filtrerade till varje människa, och räknar ut hur länge klienterna animerar.
@@ -367,9 +342,6 @@ func _sanda_steg(b: Dictionary) -> void:
 			"stick":
 				paus += 1.6
 				b.tagna.append([e.vinnare, e.stick.map(func(x): return x[1])])
-				# en robot som tar ett stick gör ibland 6-7
-				if b.robotlek and b.platser[e.vinnare].typ == "robot" and rng.randf() < 0.12:
-					b.kastko.append([tid + paus * tempo, e.vinnare, e.vinnare, "sexsju"])
 			"vinst":
 				paus += 3.0
 			"giv_slut":
@@ -417,9 +389,6 @@ func _kasta(id: int, b: Dictionary, p: int, d: Dictionary) -> void:
 		return
 	b.kast[p] = tid
 	_sand_kast(b, p, till, vad)
-	# en robot kastar ibland tillbaka
-	if till != p and b.robotlek and b.platser[till].typ == "robot" and rng.randf() < 0.45:
-		b.kastko.append([tid + rng.randf_range(1.6, 2.6), till, p, Natverk.robotsvar(vad, rng)])
 
 
 func _sand_kast(b: Dictionary, fran: int, till: int, vad: String) -> void:
@@ -450,7 +419,7 @@ func _koppla_fran(id: int, frivilligt := false) -> void:
 	anslutningar.erase(id)
 
 
-# ------------------------------------------------------------------ robotar och städning
+# ------------------------------------------------------------------ frånvaro och städning
 func _tick(b: Dictionary, dt: float) -> void:
 	var nagon := false
 	for pl in b.platser:
@@ -465,12 +434,6 @@ func _tick(b: Dictionary, dt: float) -> void:
 			print("Bord %s städas bort" % b.kod)
 		bord.erase(b.kod)
 		return
-	# robotarnas svar på kast
-	for k in range(b.kastko.size() - 1, -1, -1):
-		var x: Array = b.kastko[k]
-		if tid >= x[0]:
-			b.kastko.remove_at(k)
-			_sand_kast(b, x[1], x[2], x[3])
 	var m = b.motor
 	if m == null:
 		return
@@ -483,20 +446,21 @@ func _tick(b: Dictionary, dt: float) -> void:
 		return
 	if m.fas != Motor.Fas.BYTE and m.fas != Motor.Fas.CHICAGO and m.fas != Motor.Fas.STICK:
 		return
+	# Är den som har turen frånkopplad länge gör servern ett enkelt drag, så att partiet inte står still:
+	# inget byte, ingen Chicago, och det lägsta tillåtna kortet i sticket. Ingen robot, ingen taktik.
 	var p: int = m.tur
 	var pl: Dictionary = b.platser[p]
-	var robot: bool = pl.typ == "robot"
-	var franvarande: bool = pl.typ == "manniska" and (pl.id < 0 or not anslutningar.has(pl.id)) and pl.borta > franvaro_robot
-	if not robot and not franvarande:
+	var franvarande: bool = (pl.id < 0 or not anslutningar.has(pl.id)) and pl.borta > franvaro_auto
+	if not franvarande:
 		return
-	var niva: int = pl.niva if robot else Robot.MEDEL
-	var vy: Dictionary = m.vy(p)
 	match m.fas:
 		Motor.Fas.BYTE:
-			m.byt(p, Robot.valj_byte(vy, niva, rng))
+			m.byt(p, [])
 		Motor.Fas.CHICAGO:
-			m.ropa_chicago(p, Robot.valj_chicago(vy, niva, rng))
+			m.ropa_chicago(p, false)
 		Motor.Fas.STICK:
-			m.spela(p, Robot.valj_kort(vy, niva, rng))
+			var till: Array = m.tillatna(p)
+			till.sort_custom(func(a: int, c: int) -> bool: return a % 13 < c % 13)
+			m.spela(p, till[0])
 	b.vanta = 0.6 * tempo
 	_sanda_steg(b)

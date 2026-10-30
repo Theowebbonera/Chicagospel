@@ -7,10 +7,7 @@ const Natverk := preload("res://scripts/natverk.gd")
 const Figurer := preload("res://scripts/figurer.gd")
 const Gubbe := preload("res://scripts/gubbe.gd")
 
-signal snabbstart
-signal starta(spelare: Array, regler, visning: Dictionary)
 signal atgard(data)
-signal overlamning_klar
 signal till_meny
 signal spela_igen
 signal avsluta
@@ -20,8 +17,6 @@ signal egen_sexsju
 signal skapa_online(namn: String, antal: int, regler, visning: Dictionary)
 signal ga_med_online(kod: String, namn: String, figur: int)
 signal fraga_bordinfo(kod: String)
-signal lobby_plats(plats: int, typ: String, niva: int)
-signal lobby_fyll
 signal lobby_starta
 signal lobby_lamna
 signal lobby_figur(figur: int)
@@ -33,7 +28,6 @@ const GULD := Color(0.95, 0.77, 0.36)
 const KRAM := Color(0.97, 0.94, 0.87)
 const GRA := Color(0.68, 0.66, 0.6)
 const SPELARFARG := [Color(0.95, 0.77, 0.36), Color(0.42, 0.72, 0.98), Color(0.95, 0.45, 0.42), Color(0.55, 0.85, 0.5), Color(0.8, 0.55, 0.95), Color(0.98, 0.6, 0.25)]
-const TYPER := ["Människa", "Robot – lätt", "Robot – medel", "Robot – svår"]
 const STANDARDNAMN := ["Theo", "Astrid", "Bertil", "Cecilia", "Doris", "Erik"]
 
 var font_r: FontVariation
@@ -47,7 +41,6 @@ var huvudmeny: Control
 var installningar: Control
 var regelvy: Control
 var hud: Control
-var overlamning: Control
 var paus: Control
 var slut: Control
 
@@ -56,10 +49,8 @@ var arb_regler
 var regel_kontroller := {}
 var antal_spin: SpinBox
 var spelar_rader: Array = []
-var vis_fyrfarg: CheckBox
 var vis_fart: OptionButton
 var vis_ljud: CheckBox
-var vis_kasta: CheckBox
 var inst_titel: Label
 var inst_start: Button
 var antal_text: Label
@@ -81,8 +72,6 @@ var atgard_hand: Label
 var atgard_knappar: HBoxContainer
 var logg: VBoxContainer
 var regel_text: RichTextLabel
-var overlamning_namn: Label
-var overlamning_text: Label
 var slut_titel: Label
 var slut_lista: VBoxContainer
 var mal := 52
@@ -97,7 +86,6 @@ func _ready() -> void:
 	_bygg_huvudmeny()
 	_bygg_installningar()
 	_bygg_regelvy()
-	_bygg_overlamning()
 	_bygg_paus()
 	_bygg_slut()
 	_bygg_online()
@@ -287,7 +275,7 @@ func _anpassa_paneler() -> void:
 
 
 func _gomt_allt() -> void:
-	for c in [huvudmeny, installningar, regelvy, hud, overlamning, paus, slut, ga_med_vy, lobby_vy]:
+	for c in [huvudmeny, installningar, regelvy, hud, paus, slut, ga_med_vy, lobby_vy]:
 		if c:
 			c.visible = false
 
@@ -319,12 +307,12 @@ func _bygg_huvudmeny() -> void:
 	titel.add_theme_constant_override("shadow_outline_size", 18)
 	titel.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	v.add_child(titel)
-	var under := _lbl("Svensk poker med stick · bara poäng, inga insatser", 22 if mobil else 26, false, Color(0.9, 0.86, 0.76))
+	var under := _lbl("Svensk poker med stick · spela online med dina vänner", 22 if mobil else 26, false, Color(0.9, 0.86, 0.76))
 	v.add_child(under)
 	var mell := Control.new()
 	mell.custom_minimum_size = Vector2(0, 6 if mobil else 30)
 	v.add_child(mell)
-	var knappar := [["Snabbstart – du mot tre robotar", func() -> void: snabbstart.emit()], ["Nytt parti …", func() -> void: visa_installningar()], ["Skapa bord online …", func() -> void: visa_installningar_online()], ["Gå med i bord …", func() -> void: visa_ga_med("", get_parent().sparat_namn(), spelar_rader[0].figur)], ["Regler", func() -> void: visa_regler(null)]]
+	var knappar := [["Skapa bord …", func() -> void: visa_installningar()], ["Gå med i bord …", func() -> void: visa_ga_med("", get_parent().sparat_namn(), spelar_rader[0].figur)], ["Regler", func() -> void: visa_regler(null)]]
 	# på webben går det inte att avsluta programmet
 	if not OS.has_feature("web"):
 		knappar.append(["Avsluta", func() -> void: avsluta.emit()])
@@ -334,7 +322,7 @@ func _bygg_huvudmeny() -> void:
 		b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		v.add_child(b)
-	var fot := _lbl("Kortleken, bordet och ljuden är gjorda i kod · Typsnitt Fredoka (SIL OFL)", 16, false, Color(0.7, 0.68, 0.62, 0.7))
+	var fot := _lbl("Klädda kort: Byron Knolls Vector Playing Cards (public domain) · Typsnitt Fredoka (SIL OFL)", 16, false, Color(0.7, 0.68, 0.62, 0.7))
 	huvudmeny.add_child(fot)
 	fot.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	fot.offset_left = 110
@@ -355,7 +343,7 @@ func _bygg_installningar() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	p.add_child(v)
-	inst_titel = _lbl("Nytt parti", 44, true, GULD)
+	inst_titel = _lbl("Skapa bord", 44, true, GULD)
 	v.add_child(inst_titel)
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 28)
@@ -366,8 +354,10 @@ func _bygg_installningar() -> void:
 	vv.custom_minimum_size = Vector2(560, 0)
 	vv.add_theme_constant_override("separation", 10)
 	h.add_child(vv)
-	vv.add_child(_rubrik("Spelare"))
+	vv.add_child(_rubrik("Du"))
 	var ah := HBoxContainer.new()
+	# antalet bestäms av hur många som går med (2–6); raden finns kvar för sparade inställningar
+	ah.visible = false
 	antal_text = _lbl("Antal spelare")
 	ah.add_child(antal_text)
 	var sp := Control.new()
@@ -388,15 +378,13 @@ func _bygg_installningar() -> void:
 		prick.custom_minimum_size = Vector2(10, 40)
 		rad.add_child(prick)
 		var namn := LineEdit.new()
-		namn.text = STANDARDNAMN[i] if i > 0 else "Du"
+		namn.text = STANDARDNAMN[i]
 		namn.custom_minimum_size = Vector2(170, 0)
 		namn.max_length = 14
 		rad.add_child(namn)
 		var typ := OptionButton.new()
-		for t in TYPER:
-			typ.add_item(t)
-		typ.select(0 if i == 0 else 2)
-		typ.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		typ.add_item("Människa")
+		typ.visible = false
 		rad.add_child(typ)
 		vv.add_child(rad)
 		var fk := Button.new()
@@ -409,18 +397,11 @@ func _bygg_installningar() -> void:
 		rad.add_child(fk)
 		spelar_rader.append({"rad": rad, "namn": namn, "typ": typ, "figur": 0 if i == 0 else -1, "figurknapp": fk})
 		fk.text = _figurtext(0 if i == 0 else -1)
-	inst_tips = _lbl("Flera människor turas om vid samma dator. Handen döljs mellan turerna.", 17, false, GRA)
+	inst_tips = _lbl("Du får en länk som du skickar till dina vänner. De väljer sin figur och hamnar i lobbyn. Du startar när alla har gått med (2–6 spelare).", 17, false, GRA)
 	inst_tips.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	inst_tips.custom_minimum_size = Vector2(540, 0)
 	vv.add_child(inst_tips)
 	vv.add_child(_rubrik("Visning"))
-	vis_fyrfarg = CheckBox.new()
-	vis_fyrfarg.text = "Fyrfärgslek (ruter blå, klöver grön)"
-	vv.add_child(vis_fyrfarg)
-	vis_kasta = CheckBox.new()
-	vis_kasta.text = "Robotar kastar tillbaka och busar (6-7)"
-	vis_kasta.button_pressed = true
-	vv.add_child(vis_kasta)
 	vis_ljud = CheckBox.new()
 	vis_ljud.text = "Ljud"
 	vis_ljud.button_pressed = true
@@ -497,11 +478,8 @@ func _bygg_installningar() -> void:
 	var mel := Control.new()
 	mel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	kh.add_child(mel)
-	kh.add_child(_knapp("Tillbaka", func() -> void:
-		online_lage = false
-		_satt_lage()
-		visa_huvudmeny()))
-	var start := _knapp("Starta partiet", func() -> void: _starta(), 26)
+	kh.add_child(_knapp("Tillbaka", func() -> void: visa_huvudmeny()))
+	var start := _knapp("Skapa bord", func() -> void: _starta(), 26)
 	inst_start = start
 	start.add_theme_color_override("font_color", GULD)
 	kh.add_child(start)
@@ -517,8 +495,9 @@ func _rubrik(t: String) -> Label:
 
 
 func _visa_rader() -> void:
+	# bara värdens egen rad (namn och figur); de andra väljer själva när de går med
 	for i in 6:
-		spelar_rader[i].rad.visible = i < int(antal_spin.value)
+		spelar_rader[i].rad.visible = i == 0
 
 
 func _uppdatera_kontroller() -> void:
@@ -534,35 +513,18 @@ func _uppdatera_kontroller() -> void:
 
 
 func visa_installningar() -> void:
-	online_lage = false
-	_satt_lage()
 	_gomt_allt()
 	installningar.visible = true
 
 
-func spelarlista() -> Array:
-	var ut: Array = []
-	for i in int(antal_spin.value):
-		var r: Dictionary = spelar_rader[i]
-		var namn: String = r.namn.text.strip_edges()
-		if namn == "":
-			namn = "Spelare %d" % (i + 1)
-		var t: int = r.typ.selected
-		ut.append({"namn": namn, "robot": t > 0, "niva": maxi(t - 1, 0), "figur": r.figur})
-	return ut
-
-
 func visningsval() -> Dictionary:
-	return {"oppna": false, "kasta_tillbaka": vis_kasta.button_pressed, "fyrfarg": vis_fyrfarg.button_pressed, "fart": vis_fart.selected, "ljud": vis_ljud.button_pressed}
+	return {"fart": vis_fart.selected, "ljud": vis_ljud.button_pressed}
 
 
 func _starta() -> void:
 	_spara_installningar()
-	if online_lage:
-		var namn: String = spelar_rader[0].namn.text.strip_edges()
-		skapa_online.emit(namn if namn != "" else "Värd", int(antal_spin.value), arb_regler.kopia(), visningsval())
-		return
-	starta.emit(spelarlista(), arb_regler.kopia(), visningsval())
+	var namn: String = spelar_rader[0].namn.text.strip_edges()
+	skapa_online.emit(namn if namn != "" else Figurer.namn(maxi(spelar_rader[0].figur, 0)), 6, arb_regler.kopia(), visningsval())
 
 
 func _spara_installningar() -> void:
@@ -571,7 +533,6 @@ func _spara_installningar() -> void:
 	cf.set_value("spelare", "antal", int(antal_spin.value))
 	for i in 6:
 		cf.set_value("spelare", "namn%d" % i, spelar_rader[i].namn.text)
-		cf.set_value("spelare", "typ%d" % i, spelar_rader[i].typ.selected)
 		cf.set_value("spelare", "figur%d" % i, spelar_rader[i].figur)
 	var vis := visningsval()
 	for k in vis:
@@ -587,11 +548,8 @@ func _ladda_installningar() -> void:
 	antal_spin.set_value_no_signal(int(cf.get_value("spelare", "antal", 4)))
 	for i in 6:
 		spelar_rader[i].namn.text = str(cf.get_value("spelare", "namn%d" % i, spelar_rader[i].namn.text))
-		spelar_rader[i].typ.select(int(cf.get_value("spelare", "typ%d" % i, spelar_rader[i].typ.selected)))
 		_satt_radfigur(i, int(cf.get_value("spelare", "figur%d" % i, spelar_rader[i].figur)))
-	vis_fyrfarg.button_pressed = bool(cf.get_value("visning", "fyrfarg", false))
 	vis_ljud.button_pressed = bool(cf.get_value("visning", "ljud", true))
-	vis_kasta.button_pressed = bool(cf.get_value("visning", "kasta_tillbaka", true))
 	vis_fart.select(int(cf.get_value("visning", "fart", 1)))
 
 
@@ -620,7 +578,7 @@ func visa_regler(r) -> void:
 	var t: String = r.beskrivning()
 	t += "\n\n[b]Pokerhänderna, från sämst till bäst:[/b] par · två par · triss (tre lika) · stege (fem i följd) · färg (fem i samma färg) · kåk (triss + par) · fyrtal · färgstege · royal straight flush (tio till ess i samma färg). Vid samma sorts hand avgör högsta valören, sedan nästa och så vidare."
 	t += "\n\n[b]Styrning:[/b] klicka på kort för att välja vilka som ska bytas och tryck Byt. I sticken klickar du på kortet du vill spela, otillåtna kort är mörkare. Tangenterna 1–5 väljer kort, Enter bekräftar och Esc pausar."
-	t += "\n\n[b]Dolda kort:[/b] bara korten som läggs ut i sticken syns öppet, och din egen hand när det är din tur. Robotarnas händer, slängda kort och tagna stick ligger alltid med baksidan upp. Spelar flera människor vid samma dator visas en överlämningsskärm och handen vänds först när nästa spelare klickar."
+	t += "\n\n[b]Dolda kort:[/b] bara korten som läggs ut i sticken syns öppet, och din egen hand när det är din tur. Andras händer, slängda kort och tagna stick ligger alltid med baksidan upp, och servern skickar aldrig andras kort till din dator."
 	regel_text.text = t
 	regelvy.visible = true
 	regelvy.move_to_front()
@@ -902,7 +860,7 @@ func visa_hud(spelare: Array, malpoang: int) -> void:
 		pts.custom_minimum_size = Vector2(54, 0)
 		pts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		h.add_child(pts)
-		var under := _lbl(("Robot · " + ["lätt", "medel", "svår"][s.niva]) if s.robot else "Människa", 16, false, GRA)
+		var under := _lbl("", 16, false, GRA)
 		v.add_child(under)
 		var bar := ProgressBar.new()
 		bar.max_value = malpoang
@@ -936,10 +894,8 @@ func uppdatera_tavla(poang: Array, tur: int, givare: int, info: Array, brickor: 
 		r.pts.text = str(poang[i])
 		r.bar.value = clampi(poang[i], 0, mal)
 		r.panel.add_theme_stylebox_override("panel", _rad_sb(i == tur, i))
-		var txt: String = r.typ
-		if i < info.size() and info[i] != "":
-			txt += " · " + info[i]
-		r.under.text = txt
+		r.under.text = info[i] if i < info.size() else ""
+		r.under.visible = r.under.text != ""
 		var b: String = brickor[i] if i < brickor.size() else ""
 		if i == givare:
 			b = ("Giv  " + b).strip_edges() if b == "" else "Giv · " + b
@@ -1015,34 +971,6 @@ func dolj_atgard() -> void:
 
 
 # ================================================================== överlämning, paus, slut
-func _bygg_overlamning() -> void:
-	overlamning = _helskarm(Color(0.01, 0.015, 0.012, 0.97))
-	var p := _centrerad_panel(overlamning, 700, 320)
-	var v := VBoxContainer.new()
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 18)
-	p.add_child(v)
-	overlamning_namn = _lbl("", 44, true, GULD)
-	overlamning_namn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(overlamning_namn)
-	overlamning_text = _lbl("", 22, false, KRAM)
-	overlamning_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	overlamning_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(overlamning_text)
-	var b := _knapp("Visa mina kort", func() -> void:
-		overlamning.visible = false
-		overlamning_klar.emit(), 28)
-	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	v.add_child(b)
-
-
-func visa_overlamning(namn: String) -> void:
-	overlamning_namn.text = "Lämna över till %s" % namn
-	overlamning_text.text = "Alla kort är vända. Bara %s ska titta på skärmen när korten vänds upp." % namn
-	overlamning.visible = true
-	overlamning.move_to_front()
-
-
 func _bygg_paus() -> void:
 	paus = _helskarm(Color(0, 0, 0, 0.6))
 	var p := _centrerad_panel(paus, 460, 0)
@@ -1124,9 +1052,7 @@ var lobby_lista: VBoxContainer
 var lobby_regler: RichTextLabel
 var lobby_lank := ""
 var lobby_knapp_starta: Button
-var lobby_knapp_fyll: Button
 var klick_vy: Control
-var online_lage := false
 
 
 func _bygg_online() -> void:
@@ -1250,8 +1176,6 @@ func _bygg_online() -> void:
 	kb.add_child(_knapp("Kopiera länk", func() -> void:
 		DisplayServer.clipboard_set(lobby_lank)
 		lobby_status.text = "Länken är kopierad: " + lobby_lank))
-	lobby_knapp_fyll = _knapp("Fyll tomma platser med robotar", func() -> void: lobby_fyll.emit())
-	kb.add_child(lobby_knapp_fyll)
 	var mel := Control.new()
 	mel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	kb.add_child(mel)
@@ -1307,7 +1231,6 @@ func visa_lobby_vantar(text: String) -> void:
 		c.queue_free()
 	lobby_regler.text = ""
 	lobby_knapp_starta.visible = false
-	lobby_knapp_fyll.visible = false
 
 
 func visa_lobby_fel(text: String) -> void:
@@ -1326,33 +1249,36 @@ func visa_lobby(d: Dictionary, min_plats: int, lank: String) -> void:
 	lobby_lank = lank
 	var varde: bool = int(d.varde) == min_plats
 	lobby_titel.text = "Bord %s" % d.kod
-	var tomma := 0
+	var med := 0
 	for x in d.platser:
-		if x.typ == "tom":
-			tomma += 1
+		if x.typ != "tom":
+			med += 1
 	var t := ""
 	if varde:
-		t = "Dela länken eller koden %s med dina vänner. " % d.kod
-		t += "Du är värd: fyll tomma platser med robotar och starta när alla sitter." if tomma > 0 else "Alla platser är fyllda – starta när ni är redo."
+		t = "Kopiera länken och skicka den till dina vänner (koden är %s). De väljer sin figur och hamnar här. " % d.kod
+		t += "Starta när alla har gått med." if med >= 2 else "Minst två spelare behövs."
 	else:
-		t = "Väntar på att %s startar partiet …" % str(d.platser[int(d.varde)].namn)
+		t = "Du är med! Väntar på att %s startar partiet …" % str(d.platser[int(d.varde)].namn)
 	lobby_status.text = t
 	for c in lobby_lista.get_children():
 		c.queue_free()
+	# bara de som har gått med visas; antalet bestäms av hur många som kommer (högst 6)
 	for q in d.platser.size():
 		var x: Dictionary = d.platser[q]
+		if x.typ == "tom":
+			continue
 		var rad := HBoxContainer.new()
 		rad.add_theme_constant_override("separation", 10)
 		var prick := ColorRect.new()
 		prick.color = SPELARFARG[q]
 		prick.custom_minimum_size = Vector2(10, 36)
 		rad.add_child(prick)
-		var namn := "Ledig plats" if x.typ == "tom" else str(x.namn)
+		var namn := str(x.namn)
 		if q == min_plats:
 			namn += " (du)"
 		if q == int(d.varde):
 			namn += " · värd"
-		var l := _lbl(namn, 22, x.typ != "tom", KRAM if x.typ != "tom" else GRA)
+		var l := _lbl(namn, 22, true, KRAM)
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		rad.add_child(l)
 		var fig: int = int(x.get("figur", -1))
@@ -1360,46 +1286,23 @@ func visa_lobby(d: Dictionary, min_plats: int, lank: String) -> void:
 			var fk := _knapp(_figurtext(fig), func() -> void:
 				visa_figurvaljare(fig, false, func(f: int) -> void: lobby_figur.emit(f)), 17)
 			rad.add_child(fk)
-		elif x.typ != "tom":
-			rad.add_child(_lbl(_figurtext(fig).replace("Figur: ", ""), 16, false, GRA))
-		if x.typ == "manniska":
-			rad.add_child(_lbl("Människa" if x.ansluten else "Frånkopplad", 17, false, GRA if x.ansluten else Color(1.0, 0.6, 0.5)))
-		elif varde and not d.startad:
-			var o := OptionButton.new()
-			for tt in ["Ledig", "Robot – lätt", "Robot – medel", "Robot – svår"]:
-				o.add_item(tt)
-			o.select(0 if x.typ == "tom" else 1 + int(x.niva))
-			var plats: int = q
-			o.item_selected.connect(func(i: int) -> void:
-				lobby_plats.emit(plats, "tom" if i == 0 else "robot", maxi(i - 1, 0)))
-			rad.add_child(o)
 		else:
-			rad.add_child(_lbl("Robot – " + ["lätt", "medel", "svår"][int(x.niva)] if x.typ == "robot" else "", 17, false, GRA))
+			rad.add_child(_lbl(_figurtext(fig).replace("Figur: ", ""), 16, false, GRA))
+		if not x.ansluten:
+			rad.add_child(_lbl("Frånkopplad", 17, false, Color(1.0, 0.6, 0.5)))
 		lobby_lista.add_child(rad)
+	var lediga: int = d.platser.size() - med
+	if lediga > 0 and not d.startad:
+		lobby_lista.add_child(_lbl("Väntar på fler … (%d %s kvar)" % [lediga, "plats" if lediga == 1 else "platser"], 18, false, GRA))
 	var r := Regler.new()
 	r.fran_dict(d.regler)
 	lobby_regler.text = r.beskrivning()
 	lobby_knapp_starta.visible = varde
-	lobby_knapp_starta.disabled = tomma > 0
-	lobby_knapp_fyll.visible = varde and tomma > 0
+	lobby_knapp_starta.disabled = med < 2
 
 
 func visa_installningar_online() -> void:
-	online_lage = true
-	_satt_lage()
-	_gomt_allt()
-	installningar.visible = true
-
-
-func _satt_lage() -> void:
-	inst_titel.text = "Skapa bord online" if online_lage else "Nytt parti"
-	inst_start.text = "Skapa bord" if online_lage else "Starta partiet"
-	antal_text.text = "Antal platser" if online_lage else "Antal spelare"
-	for i in 6:
-		spelar_rader[i].typ.visible = not online_lage
-		spelar_rader[i].figurknapp.visible = not online_lage or i == 0
-	inst_tips.text = "Du får en kod och en länk som dina vänner öppnar. Tomma platser kan fyllas med robotar." if online_lage else "Flera människor turas om vid samma dator. Handen döljs mellan turerna."
-	_visa_rader()
+	visa_installningar()
 
 
 # ================================================================== figurväljare

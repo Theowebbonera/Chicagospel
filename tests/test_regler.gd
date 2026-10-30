@@ -6,7 +6,6 @@ const K := preload("res://scripts/kort.gd")
 const H := preload("res://scripts/handvarde.gd")
 const Motor := preload("res://scripts/motor.gd")
 const Regler := preload("res://scripts/regler.gd")
-const Robot := preload("res://scripts/robot.gd")
 
 var fel := 0
 var antal := 0
@@ -42,7 +41,7 @@ func _init() -> void:
 	_sticken()
 	_chicago()
 	_omblandning()
-	_robot_fuskar_inte()
+	_vyn_ar_hemlig()
 	_husregler()
 	print("%d kontroller, %d fel" % [antal, fel])
 	quit(1 if fel else 0)
@@ -442,35 +441,15 @@ func _omblandning() -> void:
 	_ok(_bevarade(m), "korten bevarade utan omblandning")
 
 
-## Roboten ska fatta samma beslut oavsett vad motståndarna har på hand.
-func _robot_fuskar_inte() -> void:
+## En spelares vy (det som skickas till klienten) innehåller inte andras händer, talongen eller slängda kort.
+func _vyn_ar_hemlig() -> void:
 	var r = _klassisk()
 	var m := Motor.new()
 	m.starta(["A", "B", "C", "D"], r, 5, 0)
 	m.ny_giv()
-	var p: int = m.tur
-	var vy: Dictionary = m.vy(p)
+	var vy: Dictionary = m.vy(m.tur)
 	for k in vy.keys():
 		_ok(k != "hander" and k != "lek" and k != "slangda", "vyn innehåller inte " + k)
-	for niva in 3:
-		var rng := RandomNumberGenerator.new()
-		rng.seed = 99
-		var a := Robot.valj_byte(m.vy(p), niva, rng)
-		# byt motståndarnas händer mot talongens kort
-		var spar: Array = m.hander.duplicate(true)
-		var lek_spar: Array = m.lek.duplicate()
-		for q in 4:
-			if q != p:
-				var ny: Array = []
-				for i in 5:
-					ny.append(m.lek.pop_back())
-				m.lek.append_array(m.hander[q])
-				m.hander[q] = ny
-		rng.seed = 99
-		var b := Robot.valj_byte(m.vy(p), niva, rng)
-		_ok(a == b, "byte nivå %d oberoende av andras kort" % niva)
-		m.hander = spar
-		m.lek = lek_spar
 
 
 # ================================================================== husreglerna (standard)
@@ -683,9 +662,3 @@ func _husregler() -> void:
 	m = _husmotor(["AS AD 9H 9C 3S", "7C 4D JH KC 2S"], [50, 60], func(rr): rr.chicago_kravs_for_vinst = false)
 	_ok(m.vinnare == 1, "högst total vinner när flera når målet")
 
-	# --- robotarna följer reglerna
-	m = _husmotor(["7C 9D JH KC 2S", "AS AD 9H 7H 3S"], [10, 10], func(r): r.antal_byten = 0)
-	var rng := RandomNumberGenerator.new()
-	_ok(not Robot.valj_chicago(m.vy(0), Robot.SVAR, rng), "robot under 15 ropar inte Chicago")
-	var vy_k: Dictionary = {"max_byte": 0, "poangsatts": true, "hand": K.las("2S 4D 7H 9C JS"), "regler": Regler.new(), "egna_slangda": [], "spelade": [], "n": 2, "byten_kvar": 2}
-	_ok(Robot.valj_byte(vy_k, Robot.SVAR, rng).is_empty(), "robot med köpstopp byter inget")

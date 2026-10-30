@@ -1,6 +1,5 @@
 extends RefCounted
-## Robotspelare för Chicago. Alla beslut tar bara spelarens egen vy från motorn (motor.vy(p)):
-## egen hand, egna slängda kort, spelade kort, hur många kort andra bytt och vilka färger de visat sig sakna.
+## Testhjälp: enkel spelarlogik som testerna låter klienterna spela med (spelet har inga robotar).
 ## Andras kort är okända och gissas genom slumpade utdelningar av de kort spelaren inte har sett.
 
 const K := preload("res://scripts/kort.gd")

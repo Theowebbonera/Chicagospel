@@ -1,13 +1,12 @@
 extends Node3D
-## Chicago i 3D. Styr partiet: frågar motorn vems tur det är, låter robotar eller människor agera
+## Chicago i 3D, bara online: värden skapar ett bord och delar länken, servern (server.gd) styr partiet
 ## och spelar upp motorns händelser som animeringar (blandning, giv, byten, visning, stick, poäng).
-## Regler: motor.gd · Robotar: robot.gd · Bord: bord.gd · Kort: kort3d.gd + kortbild.gd · Gränssnitt: ui.gd
+## Regler: motor.gd · Bord: bord.gd · Kort: kort3d.gd + kortbild.gd · Gränssnitt: ui.gd
 
 const K := preload("res://scripts/kort.gd")
 const H := preload("res://scripts/handvarde.gd")
 const Motor := preload("res://scripts/motor.gd")
 const Regler := preload("res://scripts/regler.gd")
-const Robot := preload("res://scripts/robot.gd")
 const Kort3D := preload("res://scripts/kort3d.gd")
 const Kortbild := preload("res://scripts/kortbild.gd")
 const Bord := preload("res://scripts/bord.gd")
@@ -26,7 +25,6 @@ const KASTSPARR := 3.0
 const R_HAND := 4.45
 const R_STICK := 1.75
 const LYFT := 0.0035
-const DEMONAMN := ["Astrid", "Bertil", "Cecilia", "Doris", "Erik", "Frida"]
 
 signal beslut(data)
 
@@ -59,13 +57,10 @@ var bytes_info: Array = []
 var brickor: Array = []
 var visar := -1
 var korning := 0
-var demo := false
-var auto_man := false
 var rng := RandomNumberGenerator.new()
 var tf := 1.0
 var fart_tvingad := -1.0
 var fro := -1
-var dolj_efter := -1
 var stick_par: Array = []  # [spelare, kort] för korten som ligger i sticket
 var stick_etiketter: Array = []
 var online := false
@@ -93,12 +88,10 @@ func _ready() -> void:
 	if "--server" in args:
 		_kor_server(args)
 		return
-	demo = "--demo" in args
 	if Natverk.ar_mobil():
 		# telefon: större gränssnitt (knappar och text) och lägre 3D-upplösning för äldre telefoner
 		get_window().content_scale_factor = 1.5
 		get_viewport().scaling_3d_scale = 0.75
-	auto_man = "--automan" in args
 	for a in args:
 		if a.begins_with("--seed="):
 			fro = int(a.substr(7))
@@ -114,10 +107,10 @@ func _ready() -> void:
 	add_child(kam)
 	# mjukt ljus för handen man håller (den ligger utanför lampans kägla)
 	var handljus := OmniLight3D.new()
-	handljus.position = Vector3(0.0, 1.8, -2.8)
-	handljus.omni_range = 5.2
-	handljus.omni_attenuation = 0.6
-	handljus.light_energy = 1.1
+	handljus.position = Vector3(0.0, 0.4, -3.4)
+	handljus.omni_range = 6.0
+	handljus.omni_attenuation = 0.5
+	handljus.light_energy = 2.1
 	handljus.light_color = Color(1.0, 0.9, 0.78)
 	kam.add_child(handljus)
 	ljud = Ljud.new()
@@ -132,16 +125,12 @@ func _ready() -> void:
 	ui = UI.new()
 	ui.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(ui)
-	ui.snabbstart.connect(_snabbstart)
-	ui.starta.connect(func(sp: Array, r, vis: Dictionary) -> void: starta_parti(sp, r, vis))
 	ui.atgard.connect(func(d) -> void: beslut.emit(d))
 	ui.till_meny.connect(_till_meny)
 	ui.spela_igen.connect(_spela_igen)
 	ui.skapa_online.connect(skapa_online)
 	ui.ga_med_online.connect(ga_med_online)
 	ui.fraga_bordinfo.connect(fraga_bordinfo)
-	ui.lobby_plats.connect(lobby_plats)
-	ui.lobby_fyll.connect(lobby_fyll)
 	ui.lobby_starta.connect(lobby_starta)
 	ui.lobby_figur.connect(func(f: int) -> void: klient.skicka({"t": "figur", "figur": f}))
 	ui.lobby_lamna.connect(func() -> void:
@@ -163,58 +152,18 @@ func _ready() -> void:
 		kortlager.add_child(k)
 		kort.append(k)
 	_meny_dekor(true)
+	# handen anpassas efter fönstret (t.ex. när telefonen vrids)
+	get_viewport().size_changed.connect(func() -> void:
+		if not meny_lage and betraktare < vhand.size():
+			_layout_sats(betraktare, 0.15, 0.0))
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("window.chicagoStartad = true;", true)
-	if demo:
-		var sp: Array = []
-		for i in 4:
-			sp.append({"namn": DEMONAMN[i], "robot": true, "niva": [2, 1, 2, 0][i]})
-		if auto_man:
-			sp[0] = {"namn": "Du", "robot": false, "niva": 0}
-		if "--hotseat" in args:
-			auto_man = true
-			sp[0] = {"namn": "Anna", "robot": false, "niva": 0}
-			sp[2] = {"namn": "Bo", "robot": false, "niva": 0}
-		var r := Regler.new()
-		for a in args:
-			if a.begins_with("--mal="):
-				r.malpoang = int(a.substr(6))
-		starta_parti(sp, r, {"oppna": true, "fyrfarg": false, "fart": 1, "ljud": true, "kasta_tillbaka": true})
-		if "--kasta" in args:
-			_demokast()
-		if "--kastmeny" in args:
-			# inspelning: visa kastmenyn över figuren mittemot
-			get_tree().create_timer(3.0, false).timeout.connect(func() -> void:
-				var mal := 2 if n > 2 else 1
-				ui.visa_kastmeny(kam.unproject_position(gubbar[mal].huvudpos()) + Vector2(30, 0), mal, spelare[mal].namn))
-	elif "--installningar" in args:
-		ui.visa_installningar()
-	elif "--figurval" in args:
-		ui.visa_installningar()
-		ui.visa_figurvaljare(8, true, func(_f: int) -> void: pass)
-	elif "--lobbydemo" in args:
-		# inspelning av lobbyn utan server
-		online_namn = "Theo"
-		ui.visa_lobby({"kod": "K7Q2", "varde": 0, "startad": false, "regler": Regler.new().till_dict(), "platser": [
-			{"namn": "Theo", "typ": "manniska", "niva": 1, "ansluten": true},
-			{"namn": "Anna", "typ": "manniska", "niva": 1, "ansluten": true},
-			{"namn": "Bertil (robot)", "typ": "robot", "niva": 2, "ansluten": true},
-			{"namn": "", "typ": "tom", "niva": 1, "ansluten": true}]}, 0, "https://exempel.github.io/chicago/?bord=K7Q2")
-	else:
-		var kod := Natverk.bord_fran_adress()
-		var efter := func() -> void:
-			if kod != "":
-				ui.visa_ga_med(kod, sparat_namn(), ui.spelar_rader[0].figur)
-				if "--ga-med-direkt" in args:
-					# inspelning: tryck på Gå med efter en stund
-					get_tree().create_timer(4.0).timeout.connect(func() -> void:
-						ga_med_online(kod, ui.ga_namn.text, ui.ga_figur))
-		if OS.has_feature("web"):
-			ui.visa_klick_start(efter)
-		else:
-			efter.call()
-		if "--regler" in args:
-			ui.visa_regler(null)
+	var kod := Natverk.bord_fran_adress()
+	if kod != "":
+		# delad länk: välj figur och gå med, sedan lobbyn (klicket på Gå med låter också ljudet starta)
+		ui.visa_ga_med(kod, sparat_namn(), ui.spelar_rader[0].figur)
+	elif OS.has_feature("web"):
+		ui.visa_klick_start(func() -> void: pass)
 
 
 ## Serverläge (headless): ingen grafik, bara den auktoritativa servern. Porten tas från --port=N eller miljövariabeln PORT.
@@ -229,21 +178,6 @@ func _kor_server(args: Array) -> void:
 	add_child(s)
 	if s.starta(port) != OK:
 		get_tree().quit(1)
-
-
-## Demo/inspelning: kastar något på en slumpad figur var femte sekund.
-func _demokast() -> void:
-	var typer := ["vattenballong", "tarta", "sexsju", "snoboll", "hjarta", "flygplan", "krona", "konfetti", "tomat", "ros"]
-	var i := 0
-	while true:
-		await get_tree().create_timer(5.0, false).timeout
-		if gubbar.is_empty():
-			continue
-		var mal := (i % (gubbar.size() - 1)) + 1
-		if mal != betraktare:
-			kastsparr = 0.0
-			_kasta_fran_mig(mal, typer[i % typer.size()])
-		i += 1
 
 
 func _glod_material() -> void:
@@ -388,49 +322,36 @@ func _kamera_till(s: int, tid := 1.1) -> void:
 
 
 func _halls(p: int) -> bool:
-	if p != betraktare or meny_lage:
-		return false
-	if not spelare[p].robot:
-		return visad
-	return _oppen_hand(p)
+	return p == betraktare and not meny_lage and visad
 
 
-## Robotarnas kort visas bara i demoläget när alla vid bordet är robotar.
-func _oppen_hand(p: int) -> bool:
-	return visning.oppna and spelare[p].robot and _antal_manniskor() == 0
-
-
-func _dolj_hand(p: int) -> void:
-	if betraktare == p and visad:
-		visad = false
-		_layout_sats(p, 0.4)
-		_uppdatera_etiketter()
-
-
-func _antal_manniskor() -> int:
-	if online:
-		return 1
-	return _antal_manniskor_i(spelare)
-
-
-func _antal_manniskor_i(lista: Array) -> int:
-	var a := 0
-	for s in lista:
-		if not s.robot:
-			a += 1
-	return a
+const HAND_DJUP := 6.5
+const HAND_GLIPA := 0.07
+const HAND_VANSTER := 360.0  # poängtavlan (px i gränssnittet)
+const HAND_HOGER := 460.0  # rutan med "Byt", "din tur" osv.
 
 
 func _hallen_tf(k: int, m: int, vald: bool, hov: bool) -> Transform3D:
 	var T := _kam_tf(_vinkel(betraktare))
-	var xc := (k - (m - 1) / 2.0) * 0.62
-	var x := xc
-	var y := -1.72 - 0.035 * xc * xc
-	var lyft := (0.24 if vald else 0.0) + (0.08 if hov else 0.0)
-	# handen hålls lutad bakåt så att lampan lyser på korten
-	var lok := Basis(Vector3.RIGHT, -0.55) * Basis(Vector3.BACK, -xc * 0.09)
-	var off := Vector3(x, y, -6.5 + k * 0.012) + lok * Vector3.UP * lyft
-	return Transform3D(T.basis * lok, T.origin + T.basis * off)
+	# Korten ligger bredvid varandra med en liten glipa, så att hela kortet syns (inte bara hörnet).
+	# Handen får plats mellan poängtavlan och åtgärdsrutan: krymps vid behov och centreras där emellan.
+	var vp := get_viewport().get_visible_rect().size
+	var ui_skala := get_window().content_scale_factor
+	var per_px := 2.0 * HAND_DJUP * tan(deg_to_rad(kam.fov) * 0.5) / vp.y
+	var fri_v := HAND_VANSTER * ui_skala
+	var fri_h := HAND_HOGER * ui_skala
+	var bredd_px := maxf(vp.x - fri_v - fri_h, vp.x * 0.45)
+	var behov := 5 * Kort3D.BREDD + 4 * HAND_GLIPA
+	var s := clampf(bredd_px * per_px / behov, 0.6, 1.0)
+	var mitt := (fri_v + (vp.x - fri_v - fri_h) * 0.5 - vp.x * 0.5) * per_px if vp.x - fri_v - fri_h >= vp.x * 0.45 else 0.0
+	var xc := (k - (m - 1) / 2.0) * (Kort3D.BREDD + HAND_GLIPA) * s
+	var x := mitt + xc
+	var y := -2.37 + Kort3D.HOJD * s * 0.5 + 0.38 - 0.02 * xc * xc
+	var lyft := ((0.24 if vald else 0.0) + (0.08 if hov else 0.0)) * s
+	# handen hålls lätt lutad bakåt så att lampan lyser på korten
+	var lok := Basis(Vector3.RIGHT, -0.32) * Basis(Vector3.BACK, -xc * 0.03)
+	var off := Vector3(x, y, -HAND_DJUP + k * 0.012) + lok * Vector3.UP * lyft
+	return Transform3D((T.basis * lok).scaled(Vector3(s, s, s)), T.origin + T.basis * off)
 
 
 func _liggande_tf(p: int, k: int, m: int, upp: bool) -> Transform3D:
@@ -533,8 +454,7 @@ func _process(dt: float) -> void:
 	kam.transform = _kam_tf(kam_vinkel)
 	kastsparr = maxf(kastsparr - dt, 0.0)
 	_hover_gubbar()
-	if not auto_man:
-		_hover_kort(get_viewport().get_mouse_position())
+	_hover_kort(get_viewport().get_mouse_position())
 
 
 ## Vilket kort i handen pekaren eller fingret är över.
@@ -560,9 +480,8 @@ func _unhandled_input(e: InputEvent) -> void:
 		return
 	if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
 		# vid touch kommer positionen samtidigt som trycket: räkna om vad som träffas just där
-		if not auto_man:
-			_hover_kort(e.position)
-			_hover_gubbar(e.position)
+		_hover_kort(e.position)
+		_hover_gubbar(e.position)
 		if hover_id >= 0:
 			_klicka(hover_id)
 		elif hover_gubbe >= 0:
@@ -637,13 +556,6 @@ func _meny_dekor(direkt := false) -> void:
 			kort[c].flyg(mal, 0.7, 0.5, randf() * 0.2)
 
 
-func _snabbstart() -> void:
-	var sp: Array = [{"namn": "Du", "robot": false, "niva": 0, "figur": ui.spelar_rader[0].figur}]
-	for i in 3:
-		sp.append({"namn": DEMONAMN[i], "robot": true, "niva": 1 + (i % 2)})
-	starta_parti(sp, ui.arb_regler.kopia(), ui.visningsval())
-
-
 func _till_meny() -> void:
 	if online:
 		lamna_online()
@@ -656,57 +568,7 @@ func _till_meny() -> void:
 
 
 # ================================================================== partiet
-func starta_parti(sp: Array, r, vis: Dictionary) -> void:
-	korning += 1
-	var id := korning
-	spelare = sp.duplicate(true)
-	# robotar (och den som valt "slumpad") får en figur som inte redan är vald
-	var valda: Array = []
-	for s in spelare:
-		valda.append(int(s.get("figur", -1)))
-	var figurer := Figurer.fordela(valda, rng)
-	for i in spelare.size():
-		spelare[i]["figur"] = figurer[i]
-	regler = r
-	visning = vis.duplicate()
-	n = spelare.size()
-	tf = [1.35, 1.0, 0.55][clampi(int(visning.fart), 0, 2)]
-	if fart_tvingad > 0.0:
-		tf = 1.0 / fart_tvingad
-	ljud.tyst = not visning.get("ljud", true)
-	inmatning = ""
-	valda = []
-	hover_id = -1
-	visar = -1
-	dolj_efter = -1
-	if _antal_manniskor_i(spelare) > 0:
-		visning.oppna = false
-	if kortbild.fyrfarg != bool(visning.fyrfarg):
-		kortbild.fyrfarg = bool(visning.fyrfarg)
-		await kortbild.bygg(font_b)
-		if id != korning:
-			return
-		for c in 52:
-			kort[c].satt_texturer(kortbild.framsidor[c], kortbild.baksidor[0])
-	meny_lage = false
-	motor = Motor.new()
-	var namn: Array = []
-	for s in spelare:
-		namn.append(s.namn)
-	motor.starta(namn, regler, fro)
-	betraktare = 0
-	for i in n:
-		if not spelare[i].robot:
-			betraktare = i
-			break
-	visad = _antal_manniskor() <= 1
-	kam_vinkel = wrapf(kam_vinkel, -PI, PI)
-	_kamera_till(betraktare, 1.4)
-	_satt_upp_bord()
-	await _kor(id)
-
-
-## Gemensamt för lokalt spel och onlinespel: händer, etiketter, figurer och gränssnitt.
+## Bordet när ett parti börjar: händer, etiketter, figurer och gränssnitt.
 func _satt_upp_bord() -> void:
 	# menyns dekorkort samlas direkt till en nedvänd hög
 	for c in 52:
@@ -753,36 +615,6 @@ func _satt_upp_bord() -> void:
 	_tavla()
 
 
-func _kor(id: int) -> void:
-	await _spela_upp(id)
-	while id == korning and motor.fas != Motor.Fas.SLUT:
-		motor.ny_giv()
-		await _spela_upp(id)
-		while id == korning and (motor.fas == Motor.Fas.BYTE or motor.fas == Motor.Fas.CHICAGO or motor.fas == Motor.Fas.STICK):
-			await _tur(id)
-			if id != korning:
-				return
-			await _spela_upp(id)
-			if id != korning:
-				return
-			if dolj_efter >= 0:
-				# flera människor vid samma dator: vänd ned handen direkt efter draget
-				await _vanta(0.5)
-				_dolj_hand(dolj_efter)
-				dolj_efter = -1
-		if id != korning:
-			return
-		if motor.fas == Motor.Fas.GIV_SLUT:
-			await _vanta(1.2)
-	if id != korning:
-		return
-	_visa_slutskarm()
-	if demo and not auto_man:
-		await _vanta(4.0)
-		if id == korning:
-			starta_parti(spelare, regler, visning)
-
-
 func _tur(id: int) -> void:
 	vantar_pa_drag = true
 	await _tur_inre(id)
@@ -792,22 +624,6 @@ func _tur(id: int) -> void:
 func _tur_inre(id: int) -> void:
 	var p: int = motor.tur
 	_visa_tur(p)
-	if spelare[p].robot:
-		# under chicagofrågan svarar robotar direkt, så att det inte märks vem som fick frågan
-		if motor.fas != Motor.Fas.CHICAGO:
-			await _vanta(rng.randf_range(0.4, 0.8))
-		if id != korning:
-			return
-		var vy: Dictionary = motor.vy(p)
-		var niva: int = spelare[p].niva
-		match motor.fas:
-			Motor.Fas.BYTE:
-				motor.byt(p, Robot.valj_byte(vy, niva, rng))
-			Motor.Fas.CHICAGO:
-				motor.ropa_chicago(p, Robot.valj_chicago(vy, niva, rng))
-			Motor.Fas.STICK:
-				motor.spela(p, Robot.valj_kort(vy, niva, rng))
-		return
 	await _forbered_manniska(p, id)
 	if id != korning:
 		return
@@ -818,8 +634,6 @@ func _tur_inre(id: int) -> void:
 			max_val = motor.max_byte(p)
 			inmatning = "byte"
 			_byte_ui(p)
-			if auto_man:
-				_auto(p, id)
 			await beslut
 			if id != korning:
 				return
@@ -832,8 +646,6 @@ func _tur_inre(id: int) -> void:
 		Motor.Fas.CHICAGO:
 			inmatning = "chicago"
 			ui.visa_atgard("Vill du ropa Chicago?", "Du lovar att ta alla fem stick. Lyckas det får du %d poäng, annars dras %d poäng." % [regler.chicago_poang, regler.chicago_straff], [["Ropa Chicago!", true, true], ["Nej tack", false]])
-			if auto_man:
-				_auto(p, id)
 			var ja = await beslut
 			if id != korning:
 				return
@@ -853,8 +665,6 @@ func _tur_inre(id: int) -> void:
 				under += " Sista sticket ger %d poäng%s." % [regler.stick_poang, (", ut på en tvåa %d" % regler.tvaa_poang) if regler.tvaa_bonus else ""]
 			ui.visa_atgard(info, under, [])
 			inmatning = "spela"
-			if auto_man:
-				_auto(p, id)
 			var c = await beslut
 			if id != korning:
 				return
@@ -864,65 +674,14 @@ func _tur_inre(id: int) -> void:
 			for k in vhand[p]:
 				kort[k].satt_dimmad(false)
 			motor.spela(p, int(c))
-	if _antal_manniskor() > 1:
-		dolj_efter = p
 
 
-func _forbered_manniska(p: int, id: int) -> void:
-	if _antal_manniskor() <= 1:
-		if betraktare != p or not visad:
-			betraktare = p
-			visad = true
-			_kamera_till(p)
-			_layout_alla(0.5)
-		return
-	if betraktare == p and visad:
-		return
-	betraktare = p
-	visad = false
-	_kamera_till(p, 0.8)
-	_layout_alla(0.5)
-	_uppdatera_etiketter()
-	ui.visa_overlamning(spelare[p].namn)
-	if auto_man:
-		get_tree().create_timer(1.2 * tf, false).timeout.connect(func() -> void:
-			if ui.overlamning.visible:
-				ui.overlamning.visible = false
-				ui.overlamning_klar.emit())
-	await ui.overlamning_klar
-	if id != korning:
-		return
-	visad = true
-	_uppdatera_etiketter()
-	_layout_sats(p, 0.45)
-	await _vanta(0.45)
-
-
-## Automatisk "människa" för demo och inspelning: använder den svåra robotens val men via gränssnittet.
-func _auto(p: int, id: int) -> void:
-	await _vanta(1.0)
-	if id != korning:
-		return
-	var vy: Dictionary = motor.vy(p)
-	match inmatning:
-		"byte":
-			for c in Robot.valj_byte(vy, Robot.SVAR, rng):
-				_klicka(c)
-				await _vanta(0.35)
-				if id != korning:
-					return
-			await _vanta(0.7)
-			if id == korning and inmatning == "byte":
-				beslut.emit("byt")
-		"chicago":
-			beslut.emit(Robot.valj_chicago(vy, Robot.SVAR, rng))
-		"spela":
-			var c := Robot.valj_kort(vy, Robot.SVAR, rng)
-			hover_id = c
-			_layout_sats(p, 0.12, 0.0)
-			await _vanta(0.6)
-			if id == korning and inmatning == "spela":
-				beslut.emit(c)
+func _forbered_manniska(p: int, _id: int) -> void:
+	if betraktare != p or not visad:
+		betraktare = p
+		visad = true
+		_kamera_till(p)
+		_layout_alla(0.5)
 
 
 func _byte_ui(p: int) -> void:
@@ -951,14 +710,13 @@ func _layout_sats(p: int, tid: float, bage := 0.25) -> void:
 	var h: Array = vhand[p]
 	var m := h.size()
 	var halls := _halls(p)
-	var upp := _oppen_hand(p)
 	for k in m:
 		var c: int = h[k]
 		var mal: Transform3D
 		if halls:
 			mal = _hallen_tf(k, m, c in valda, c == hover_id)
 		else:
-			mal = _liggande_tf(p, k, m, upp)
+			mal = _liggande_tf(p, k, m, false)
 		kort[c].flyg(mal, tid * tf, bage)
 
 
@@ -1159,14 +917,6 @@ func _kasta(fran: int, till: int, typ: String, svar: bool) -> void:
 
 
 ## 6-7: figuren gör rörelsen. Den egna platsen (utan figur framför kameran) visas i 2D.
-## En robot gör ibland 6-7 på eget initiativ (av med "Robotar kastar tillbaka och busar").
-func _kanske_sexsju(p: int, chans: float) -> void:
-	if online or p >= spelare.size() or not spelare[p].robot or not visning.get("kasta_tillbaka", true):
-		return
-	if rng.randf() < chans:
-		_sexsju(p)
-
-
 func _egen_sexsju() -> void:
 	if meny_lage:
 		return
@@ -1223,20 +973,6 @@ func _traff(fran: int, till: int, typ: String, pos: Vector3, svar: bool) -> void
 		if typ != "flygplan":
 			_stank(pos, farg, typ)
 		gubbar[till].traffad(typ)
-	# en robot kastar ibland tillbaka (går att stänga av i inställningarna)
-	if svar and not mot_mig and spelare[till].robot and visning.get("kasta_tillbaka", true) and rng.randf() < 0.45:
-		var tillbaka := Natverk.robotsvar(typ, rng)
-		var k := korning
-		get_tree().create_timer(rng.randf_range(1.2, 2.2), false).timeout.connect(func() -> void:
-			if k == korning and not meny_lage:
-				_kasta(till, fran, tillbaka, false))
-
-
-## Vad en robot svarar med: hälsningar besvaras vänligt, kast med kast.
-static func _robotsvar(typ: String, r: RandomNumberGenerator) -> String:
-	if typ in ["ros", "hjarta", "krona", "konfetti", "sexsju"]:
-		return ["ros", "hjarta", "konfetti"][r.randi_range(0, 2)]
-	return ["vattenballong", "tomat", "tarta", "snoboll", "flygplan"][r.randi_range(0, 4)]
 
 
 func _kast_start(fran: int) -> Vector3:
@@ -1580,7 +1316,7 @@ func _handelse(e: Dictionary, id: int) -> void:
 			var p: int = e.spelare
 			bytes_info[p] = "står över"
 			_popup(p, "Står över", UI.KRAM)
-			if p == betraktare and not spelare[p].robot:
+			if p == betraktare:
 				ui.visa_banner("Köpstopp", "Du har nått köpstoppet och står över bytena", UI.GULD, 1.6)
 				ui.logga("Köpstopp: du står över bytena.", UI.GULD)
 			else:
@@ -1755,14 +1491,13 @@ func _poang_anim(e: Dictionary, id: int) -> void:
 		vis_poang = e.poang_efter.duplicate()
 	var pts: int = e.poang
 	# husregeln: når man målet utan Chicago fortsätter partiet
-	if regler.chicago_kravs_for_vinst and regler.chicago_tillatet and p == betraktare and not spelare[p].robot and vis_poang[p] >= regler.malpoang and not _chicago_tagen(p):
+	if regler.chicago_kravs_for_vinst and regler.chicago_tillatet and p == betraktare and vis_poang[p] >= regler.malpoang and not _chicago_tagen(p):
 		ui.logga("Du har %d poäng men behöver en lyckad Chicago för att vinna." % vis_poang[p], UI.GULD)
 	var txt := ("+%d" % pts) if pts >= 0 else ("−%d" % -pts)
 	_popup(p, txt, UI.GULD if pts >= 0 else Color(1.0, 0.4, 0.35))
 	if p < gubbar.size():
 		if pts > 0:
 			gubbar[p].jubel(pts >= 5)
-			_kanske_sexsju(p, 0.2 if pts >= 5 else 0.08)
 		elif pts < 0:
 			gubbar[p].ledsen()
 	_tavla()
@@ -1805,7 +1540,6 @@ func _stick_anim(e: Dictionary, id: int) -> void:
 	ui.logga("%s tar stick %d med %s." % [spelare[w].namn, e.nr, K.namn(e.kort)])
 	if e.nr < 5:
 		_popup(w, "Sticket", UI.SPELARFARG[w])
-	_kanske_sexsju(w, 0.12)
 	await _vanta(1.2 if e.nr == 5 else 0.75)
 	if id != korning:
 		return
@@ -1862,7 +1596,7 @@ func skapa_online(namn: String, antal: int, r, vis: Dictionary) -> void:
 	visning = vis.duplicate()
 	ui.visa_lobby_vantar("Ansluter till servern …")
 	_anslut_om_behovs()
-	klient.skicka({"t": "skapa", "namn": namn, "antal": antal, "regler": r.till_dict(), "robotlek": vis.get("kasta_tillbaka", true), "figur": ui.spelar_rader[0].figur})
+	klient.skicka({"t": "skapa", "namn": namn, "antal": antal, "regler": r.till_dict(), "figur": ui.spelar_rader[0].figur})
 
 
 func ga_med_online(kod: String, namn: String, figur: int) -> void:
@@ -1969,14 +1703,6 @@ func _ateranslut() -> void:
 		await get_tree().create_timer(3.0).timeout
 
 
-func lobby_plats(q: int, typ: String, niva: int) -> void:
-	klient.skicka({"t": "plats", "plats": q, "typ": typ, "niva": niva})
-
-
-func lobby_fyll() -> void:
-	klient.skicka({"t": "fyll"})
-
-
 func lobby_starta() -> void:
 	klient.skicka({"t": "starta"})
 
@@ -1998,7 +1724,7 @@ func _starta_online(ogon) -> void:
 	var l: Dictionary = senaste_lobby
 	spelare = []
 	for x in l.platser:
-		spelare.append({"namn": x.namn if x.namn != "" else "Ledig", "robot": x.typ != "manniska", "niva": x.niva, "figur": int(x.get("figur", 0))})
+		spelare.append({"namn": x.namn if x.namn != "" else "Ledig", "figur": int(x.get("figur", 0))})
 	regler = Regler.new()
 	regler.fran_dict(l.regler)
 	n = spelare.size()
@@ -2022,7 +1748,6 @@ func _starta_online(ogon) -> void:
 	inmatning = ""
 	valda = []
 	hover_id = -1
-	dolj_efter = -1
 	meny_lage = false
 	betraktare = min_plats
 	visad = true
@@ -2072,8 +1797,6 @@ func _spela_igen() -> void:
 			klient.skicka({"t": "starta"})
 		else:
 			ui.visa_banner("Väntar på värden", "Värden startar nästa parti", UI.KRAM, 1.5)
-		return
-	starta_parti(spelare, regler, visning)
 
 
 ## Andra spelares kort kommer som -1. Välj en anonym kortnod, och se till att riktiga kort (egna och

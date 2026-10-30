@@ -16,13 +16,6 @@ const KODTECKEN := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const KASTTYPER := ["vattenballong", "tomat", "tarta", "snoboll", "flygplan", "ros", "hjarta", "krona", "konfetti", "sexsju"]
 
 
-## Vad en robot svarar med när någon kastat på den: hälsningar besvaras vänligt, kast med kast.
-static func robotsvar(typ: String, r: RandomNumberGenerator) -> String:
-	if typ in ["ros", "hjarta", "krona", "konfetti", "sexsju"]:
-		return ["ros", "hjarta", "konfetti"][r.randi_range(0, 2)]
-	return ["vattenballong", "tomat", "tarta", "snoboll", "flygplan"][r.randi_range(0, 4)]
-
-
 ## Körs vi i en mobilwebbläsare (eller på mobil)?
 static func ar_mobil() -> bool:
 	if OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("mobile"):

@@ -1,7 +1,7 @@
 extends SceneTree
 ## Kör: Godot --headless --path . --script res://tests/test_online.gd
-## Startar en server och tre klienter (Anna, Bo, Cia) som skapar ett bord, går med via kod, fyller med en robot
-## och spelar ett helt parti. Under partiet tappar Bo anslutningen och kommer tillbaka med sin token.
+## Startar en server och tre klienter (Anna, Bo, Cia) som skapar ett bord och går med via kod. Värden startar
+## med de tre som har gått med (lediga platser tas bort), och de spelar ett helt parti. Under partiet tappar Bo anslutningen och kommer tillbaka med sin token.
 ## Varje mottaget meddelande inspekteras: ingen klient får någonsin andras kort. Servern ska avvisa otillåtna drag,
 ## drag i fel tur, för tidiga kast, start av fel person och att gå med i ett pågående parti utan token.
 ## Sist startas servern som egen process med -- --server och en klient skapar ett bord där.
@@ -9,7 +9,7 @@ extends SceneTree
 const Server := preload("res://scripts/server.gd")
 const Klient := preload("res://scripts/klient.gd")
 const Regler := preload("res://scripts/regler.gd")
-const Robot := preload("res://scripts/robot.gd")
+const Robot := preload("res://tests/testspelare.gd")
 const Motor := preload("res://scripts/motor.gd")
 const K := preload("res://scripts/kort.gd")
 
@@ -28,7 +28,7 @@ func _ok(v: bool, t: String) -> void:
 
 class Bot extends Node:
 	const Klient := preload("res://scripts/klient.gd")
-	const Robot := preload("res://scripts/robot.gd")
+	const Robot := preload("res://tests/testspelare.gd")
 	const Regler := preload("res://scripts/regler.gd")
 	const Motor := preload("res://scripts/motor.gd")
 	var test
@@ -201,7 +201,7 @@ func _bot(namn: String) -> Bot:
 func _init() -> void:
 	server = Server.new()
 	server.tempo = 0.04
-	server.franvaro_robot = 0.8
+	server.franvaro_auto = 0.8
 	server.stada_efter = 2.0
 	server.logga_ut = false
 	root.add_child(server)
@@ -214,6 +214,11 @@ func _init() -> void:
 	print("bord skapat: ", anna.kod)
 	_ok(anna.kod.length() == 4 and anna.plats == 0, "kod med fyra tecken och värden på plats 0")
 	_ok(int(anna.regler_d.get("malpoang", 0)) == 60, "lobbyn visar bordets regler")
+	# ensam vid bordet går det inte att starta
+	anna.k.skicka({"t": "starta"})
+	await _vanta_pa(func() -> bool: return not anna.felmeddelanden.is_empty(), 3.0, "start med en spelare avvisas")
+	_ok(server.bord[anna.kod].motor == null, "inget parti med bara värden")
+	anna.felmeddelanden.clear()
 	# den som ska gå med får först bordets information: regler i läsläge och tagna figurer
 	var titt := _bot("Titt")
 	var info := {}
@@ -238,13 +243,13 @@ func _init() -> void:
 	var fel_bot := _bot("Fel")
 	fel_bot.k.skicka({"t": "ga_med", "kod": "ZZZZ", "namn": "X"})
 	await _vanta_pa(func() -> bool: return not fel_bot.felmeddelanden.is_empty(), 3.0, "fel kod avvisas")
-	# bara värden får ändra regler, lägga till robotar, fylla platser och starta
+	# bara värden får ändra regler och starta; robotar och "fyll" finns inte
 	cia.felmeddelanden.clear()
 	cia.k.skicka({"t": "plats", "plats": 3, "typ": "robot", "niva": 1})
 	cia.k.skicka({"t": "regler", "regler": {"malpoang": 99}})
 	cia.k.skicka({"t": "fyll"})
 	cia.k.skicka({"t": "figur", "figur": 5})
-	await _vanta_pa(func() -> bool: return cia.felmeddelanden.size() >= 4, 3.0, "icke-värd avvisas")
+	await _vanta_pa(func() -> bool: return cia.felmeddelanden.size() >= 4, 3.0, "icke-värd och robotmeddelanden avvisas")
 	_ok(server.bord[anna.kod].platser[3].typ == "tom" and server.bord[anna.kod].regler.malpoang == 60, "icke-värd ändrade inget")
 	_ok(server.bord[anna.kod].platser[2].figur == 7, "Cia fick inte ta Bos figur")
 	# värden kan ändra reglerna före start
@@ -253,12 +258,11 @@ func _init() -> void:
 	r2.kopstopp = 30
 	anna.k.skicka({"t": "regler", "regler": r2.till_dict()})
 	await _vanta_pa(func() -> bool: return server.bord[anna.kod].regler.kopstopp == 30, 3.0, "värden ändrar regler")
-	# bara värden får starta, och alla platser måste vara fyllda
+	# bara värden får starta
+	bo.felmeddelanden.clear()
 	bo.k.skicka({"t": "starta"})
-	anna.k.skicka({"t": "starta"})
-	await _vanta_pa(func() -> bool: return not bo.felmeddelanden.is_empty() and not anna.felmeddelanden.is_empty(), 3.0, "start avvisas")
-	anna.k.skicka({"t": "plats", "plats": 3, "typ": "robot", "niva": 2})
-	await _vanta(0.2)
+	await _vanta_pa(func() -> bool: return not bo.felmeddelanden.is_empty(), 3.0, "start av icke-värd avvisas")
+	_ok(server.bord[anna.kod].motor == null, "Bo kunde inte starta")
 	# för tidigt kast: två kast direkt efter varandra
 	anna.felmeddelanden.clear()
 	anna.k.skicka({"t": "kasta", "till": 1, "vad": "vattenballong"})
@@ -271,12 +275,10 @@ func _init() -> void:
 		x.aktiv = false
 	anna.k.skicka({"t": "starta"})
 	await _vanta_pa(func() -> bool: return not anna.s.is_empty() and int(anna.s.fas) == Motor.Fas.BYTE, 10.0, "partiet startar")
-	# figurer: människornas val behålls, robotar får unika figurer som inte är valda
+	# bara de tre som gick med spelar, med sina figurer och samma platser
 	var figs: Array = server.bord[anna.kod].platser.map(func(x): return x.figur)
-	var unika := {}
-	for f in figs:
-		unika[f] = true
-	_ok(figs[0] == 3 and figs[1] == 5 and figs[2] == 7 and not figs.has(-1) and unika.size() == figs.size(), "figurer efter start: %s" % [figs])
+	_ok(figs == [3, 5, 7], "tre spelare med sina figurer efter start: %s" % [figs])
+	_ok(server.bord[anna.kod].motor.n == 3 and anna.plats == 0 and bo.plats == 1 and cia.plats == 2, "lediga platser borttagna, platserna kvar")
 	# otillåtna drag: fel tur och kort man inte har
 	var m = server.bord[anna.kod].motor
 	var tur: int = m.tur
@@ -304,7 +306,7 @@ func _init() -> void:
 	for x in [anna, bo, cia]:
 		x.aktiv = true
 	await _vanta_pa(func() -> bool: return m.giv_nr >= 2, 60.0, "andra given börjar")
-	# Bo tappar anslutningen, en robot spelar åt honom, sedan kommer han tillbaka med token
+	# Bo tappar anslutningen, servern gör enkla drag åt honom, sedan kommer han tillbaka med token
 	var bo_token := bo.token
 	var bo_kod := bo.kod
 	bo.k.koppla_fran()

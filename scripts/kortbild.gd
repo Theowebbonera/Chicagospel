@@ -82,6 +82,15 @@ class Ritare extends Control:
 	var fyrfarg := false
 	var vit: StyleBoxFlat
 	var ram: StyleBoxFlat
+	var bilder := {}  # färg * 100 + valör -> bild för klädda kort
+
+	func _init() -> void:
+		for f in 4:
+			for v in [11, 12, 13]:
+				var fil := "res://assets/kort/%d_%d.png" % [f, v]
+				if ResourceLoader.exists(fil):
+					# som ImageTexture: den importerade texturen ritades vit i leken
+					bilder[f * 100 + v] = ImageTexture.create_from_image((load(fil) as Texture2D).get_image())
 
 	func _farg(f: int) -> Color:
 		if fyrfarg:
@@ -125,7 +134,7 @@ class Ritare extends Control:
 				_tf(o)
 				draw_arc(Vector2(B / 2.0, HJ / 2.0 + 4), 112, 0, TAU, 64, col, 2.0, true)
 		elif v >= 11:
-			_kladd(f, v, col, o)
+			_kladd_bild(f, v, col, o)
 		else:
 			for pt in _pipar(v):
 				var p := o + Vector2(B / 2.0 + pt.x * 58.0, HJ / 2.0 + pt.y * 114.0)
@@ -233,6 +242,21 @@ class Ritare extends Control:
 		return PackedVector2Array([Vector2(-0.045, 0.12), Vector2(0.045, 0.12), Vector2(0.07, 0.33), Vector2(0.14, 0.45), Vector2(0.22, 0.5), Vector2(-0.22, 0.5), Vector2(-0.14, 0.45), Vector2(-0.07, 0.33)])
 
 	# ------------------------------------------------------------ klädda kort
+	## Klädda kort med Byron Knolls bilder (public domain, assets/kort/, rastrerade av verktyg/rasta_kladda.gd).
+	## Saknas bilden ritas den enkla figuren i kod.
+	func _kladd_bild(f: int, v: int, col: Color, o: Vector2) -> void:
+		var tex: Texture2D = bilder.get(f * 100 + v)
+		if tex == null:
+			_kladd(f, v, col, o)
+			return
+		var r := Rect2(60, 62, 180, 296)
+		_tf(o)
+		draw_texture_rect(tex, r, false)
+		ram.border_color = Color(0.12, 0.12, 0.14)
+		ram.set_border_width_all(2)
+		ram.set_corner_radius_all(3)
+		draw_style_box(ram, r)
+
 	func _kladd(f: int, v: int, col: Color, o: Vector2) -> void:
 		var x0 := 66.0
 		var y0 := 60.0
