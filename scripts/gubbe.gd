@@ -52,6 +52,9 @@ func bygg(_farg: Color, stil: int) -> void:
 func bygg_figur(index: int) -> void:
 	def = Figurer.FIGURER[posmod(index, Figurer.FIGURER.size())]
 	fas = index * 1.7
+	if def.has("modell"):
+		_bygg_modell()
+		return
 	var special: String = def.get("special", "")
 	# kroppsform: bredd, höjd, djup
 	var form: Vector3 = {"smal": Vector3(0.95, 1.05, 0.72), "rund": Vector3(1.42, 0.95, 1.08), "lang": Vector3(1.05, 1.16, 0.8), "kort": Vector3(1.18, 0.86, 0.86)}.get(def.kropp, Vector3(1.18, 1.0, 0.82))
@@ -666,6 +669,9 @@ func huvudpos() -> Vector3:
 
 func _process(dt: float) -> void:
 	tid += dt
+	if skelett:
+		_process_modell(dt)
+		return
 	# andning
 	var andas := sin(tid * 1.6 + fas)
 	kropp.position.y = (0.95 if def.get("special", "") == "robot" else 0.85) + 0.02 * andas
@@ -741,3 +747,140 @@ func _process(dt: float) -> void:
 		bubbla.scale = Vector3.ONE * (1.0 + 0.08 * sin(tid * 13.0))
 		if sexsju_t <= 0.0:
 			bubbla.visible = false
+
+
+# ================================================================== realistiska figurer (modell)
+## En människa från Blender (assets/gubbar/*.glb, blender/gubbar.py). Vilan i skelettet är sittande, framsidan mot +Z
+## och måtten i meter. Modellen skalas så att huvud och axlar hamnar där de tecknade figurernas gör, och vänds mot -Z.
+## Ett osynligt huvud följer huvudbenet, så att kast, grädde, krona och droppar hamnar rätt. Blick, skakning,
+## gest, jubel och 6-7 görs genom att vrida nacke, huvud och armar i skelettet.
+const MODELL_SKALA := 4.2  # meter -> figurens enheter (huvudet där de tecknades sitter, lite större kroppar)
+const HUVUD_MITT := 0.1  # huvudets mitt ovanför huvudbenets början (m)
+var skelett: Skeleton3D
+var modell: Node3D
+var ben := {}
+var vila := {}
+var nick := 0.0
+
+
+func _bygg_modell() -> void:
+	var scen: PackedScene = load(def.modell)
+	modell = scen.instantiate()
+	add_child(modell)
+	modell.rotation.y = PI
+	modell.scale = Vector3.ONE * MODELL_SKALA
+	skelett = modell.find_children("*", "Skeleton3D", true, false)[0]
+	for b in ["spine_03", "neck_01", "head", "upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r", "hand_l", "hand_r"]:
+		var i := skelett.find_bone(b)
+		ben[b] = i
+		vila[b] = skelett.get_bone_global_rest(i)
+	# huvudets höjd: som de tecknade figurerna
+	var huvud_m: Vector3 = vila.head.origin + Vector3(0, HUVUD_MITT, 0)
+	huvud_y = 2.98
+	modell.position.y = huvud_y - huvud_m.y * MODELL_SKALA
+	# osynligt huvud på huvudbenet: de tecknade figurernas effekter (huvudradie ~0.62) krympta till ett riktigt huvud
+	var faste := BoneAttachment3D.new()
+	faste.bone_name = "head"
+	skelett.add_child(faste)
+	huvud = Node3D.new()
+	huvud.position = Vector3(0, HUVUD_MITT, 0.0)
+	# figurens -Z (framåt) är modellens +Z: huvudet vänds så att effekterna hamnar framför ansiktet
+	huvud.rotation.y = PI
+	huvud.scale = Vector3.ONE * (0.11 / 0.62)
+	faste.add_child(huvud)
+	tomatfleck = _del(_klot(0.26), _mat(Color(0.85, 0.1, 0.06), 0.3), Vector3(0.1, 0.1, -0.62), huvud)
+	tomatfleck.scale = Vector3(1.3, 1.0, 0.35)
+	tomatfleck.visible = false
+	_gradde_och_krona()
+	_droppar_och_ljus()
+	mat_troja = _mat(def.farg, 0.8)
+	troj_farg = def.farg
+
+
+## Vrider ett ben i skelettets rum: globalt läge = q * vila, räknat mot förälderns (nya) globala läge.
+func _vrid(namn: String, q: Basis, foralder_global: Basis) -> Basis:
+	var ny: Basis = q * vila[namn].basis
+	skelett.set_bone_pose_rotation(ben[namn], (foralder_global.inverse() * ny).get_rotation_quaternion())
+	return ny
+
+
+func _foralder_vila(namn: String) -> Basis:
+	return skelett.get_bone_global_rest(skelett.get_bone_parent(ben[namn])).basis
+
+
+func _process_modell(dt: float) -> void:
+	var andas := sin(tid * 1.6 + fas)
+	# blick som hos de tecknade, räknat i figurens rum (-Z framåt). I modellens rum (vänd ett halvt varv)
+	# blir vridningen kring Y densamma och nickningen kring X omvänd.
+	var lokal := to_local(blick_mal) - Vector3(0, huvud_y, 0)
+	var yaw := 0.0
+	var pitch := 0.0
+	if lokal.length() > 0.1:
+		yaw = clampf(atan2(-lokal.x, -lokal.z), -1.0, 1.0)
+		pitch = clampf(atan2(lokal.y, Vector2(lokal.x, lokal.z).length()), -0.5, 0.3)
+	bas_yaw = lerp_angle(bas_yaw, yaw, minf(dt * 4.0, 1.0))
+	nick = lerpf(nick, pitch, minf(dt * 4.0, 1.0))
+	var vrid_y := bas_yaw + sin(tid * 26.0) * 0.35 * skak
+	skak = maxf(skak - dt * 0.9, 0.0)
+	# andning: bröstet höjs lite
+	var brost := _vrid("spine_03", Basis(Vector3.RIGHT, 0.015 * andas), _foralder_vila("spine_03"))
+	var halv := Basis(Vector3.UP, vrid_y * 0.4) * Basis(Vector3.RIGHT, -nick * 0.4)
+	var hel := Basis(Vector3.UP, vrid_y) * Basis(Vector3.RIGHT, -nick)
+	var nacke := _vrid("neck_01", halv, brost)
+	_vrid("head", hel, nacke)
+	# hopp/jubel
+	position.y = bas_y + absf(sin(tid * 9.0)) * 0.35 * hopp
+	hopp = maxf(hopp - dt * 0.7, 0.0)
+	glad = maxf(glad - dt * 0.4, 0.0)
+	# armar: gest med höger arm, båda upp vid jubel, 6-7 med handflatorna upp
+	var gestv := 0.0
+	if gest_t >= 0.0:
+		gest_t += dt
+		gestv = sin(clampf(gest_t / 0.6, 0.0, 1.0) * PI)
+		if gest_t > 0.6:
+			gest_t = -1.0
+	var upp := hopp
+	for s in [["r", -1.0], ["l", 1.0]]:
+		var sida: String = s[0]
+		var sx: float = s[1]
+		# överarmen svingas framåt och upp kring sidledsaxeln (negativ vinkel = framåt/upp), ut åt sidan vid jubel
+		var lyft := upp * 2.3 + (gestv * 1.3 if sida == "r" else 0.0)
+		var q := Basis(Vector3.FORWARD, sx * upp * 0.35) * Basis(Vector3.RIGHT, -lyft)
+		var ov := _vrid("upperarm_" + sida, q, _foralder_vila("upperarm_" + sida))
+		var under_q := Basis()
+		if sexsju_t > 0.0:
+			# underarmarna gungar upp och ned i otakt
+			under_q = Basis(Vector3.RIGHT, -(0.35 + sin(tid * 13.0 + (0.0 if sida == "r" else PI)) * 0.3))
+		# underarmen följer överarmen: dess vila vrids med överarmen
+		var u_ny: Basis = under_q * q * vila["lowerarm_" + sida].basis
+		skelett.set_bone_pose_rotation(ben["lowerarm_" + sida], (ov.inverse() * u_ny).get_rotation_quaternion())
+		var h_q := under_q * q
+		if sexsju_t > 0.0:
+			# handflatorna uppåt: handen rullas nästan ett halvt varv kring underarmen
+			var axel: Vector3 = (u_ny * Vector3.UP).normalized()
+			h_q = Basis(axel, PI * 0.9 * -sx) * h_q
+		skelett.set_bone_pose_rotation(ben["hand_" + sida], (u_ny.inverse() * (h_q * vila["hand_" + sida].basis)).get_rotation_quaternion())
+	if sexsju_t > 0.0:
+		sexsju_t -= dt
+		bubbla.scale = Vector3.ONE * (1.0 + 0.08 * sin(tid * 13.0))
+		if sexsju_t <= 0.0:
+			bubbla.visible = false
+	blot = maxf(blot - dt * 0.16, 0.0)
+	droppar.emitting = blot > 0.15
+	if tomat_t > 0.0:
+		tomat_t -= dt
+		if tomat_t <= 0.0:
+			tomatfleck.visible = false
+	if gradde_t > 0.0:
+		gradde_t -= dt
+		if gradde_t < 1.0:
+			gradde.scale = Vector3.ONE * maxf(gradde_t, 0.05)
+		if gradde_t <= 0.0:
+			gradde.visible = false
+			gradde.scale = Vector3.ONE
+	if krona_t > 0.0:
+		krona_t -= dt
+		krona.position.y = 0.66 + 0.03 * sin(tid * 3.0)
+		if krona_t <= 0.0:
+			krona.visible = false
+	rodnad = maxf(rodnad - dt * 0.25, 0.0)

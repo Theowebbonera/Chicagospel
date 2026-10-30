@@ -1,3 +1,6 @@
 .godot/
 # Byggen skapas med export (se README); webbversionen läggs på gh-pages-grenen.
 build/
+
+# provbilder från blender/gubbar.py
+blender/prov/

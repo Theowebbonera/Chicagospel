@@ -1,6 +1,7 @@
 extends RefCounted
 ## Galleriet med figurer som kan sitta vid bordet. Varje figur beskrivs med kroppsform, hudton, frisyr, ansikte,
-## kläder och accessoarer, och byggs i kod av gubbe.gd. Specialfigurer: robot, hund och katt.
+## kläder och accessoarer, och byggs i kod av gubbe.gd. Specialfigurer: robot, hund och katt. Figurer med "modell"
+## är realistiska människor från Blender (assets/gubbar/), som gubbe.gd styr via skelettet.
 
 const HUD := {
 	"ljus": Color(0.98, 0.84, 0.72), "rosa": Color(0.99, 0.8, 0.72), "mellan": Color(0.87, 0.67, 0.5),
@@ -50,6 +51,11 @@ const FIGURER := [
 	{"namn": "Katten Måns", "special": "katt", "kropp": "smal", "hud": "ljus", "har": "ingen", "harfarg": Color(0.45, 0.45, 0.5),
 		"ogon": "katt", "mun": "le", "bryn": "ingen", "klader": "pals", "farg": Color(0.5, 0.5, 0.55), "farg2": Color(0.95, 0.75, 0.2),
 		"acc": []},
+	# Realistiska figurer (Blender + MPFB, blender/gubbar.py) efter Theos bild från fjälltoppen.
+	{"namn": "Kevin", "modell": "res://assets/gubbar/kevin.glb", "farg": Color(0.2, 0.2, 0.22)},
+	{"namn": "Theo", "modell": "res://assets/gubbar/theo.glb", "farg": Color(0.1, 0.12, 0.25)},
+	{"namn": "Lukas", "modell": "res://assets/gubbar/lukas.glb", "farg": Color(0.07, 0.07, 0.08)},
+	{"namn": "Adam", "modell": "res://assets/gubbar/adam.glb", "farg": Color(0.94, 0.94, 0.93)},
 ]
 
 

@@ -36,6 +36,12 @@ Allt går att ändra under **Skapa bord**. Knappen **Klassiska regler** ger de v
 - Under Chicago-frågan visas inte vems tur det är, eftersom det skulle avslöja vem som har rätt att ropa. Köpstopp och Chicago-rätt får man bara veta om sig själv. För andra syns bara att de "står över".
 - Servern skickar bara spelarens egen vy (`motor.vy(p)`). Andras kort når aldrig din dator, så ingen kan fuska.
 
+## Realistiska figurer (Kevin, Theo, Lukas, Adam)
+- Fyra figurer efter Theos bild från fjälltoppen, byggda i Blender 4.5 med MPFB (MakeHuman, CC0): kropp, hud, hår och kläder från MPFB, kläderna omfärgade efter bilden. Kepsar, glasögon, solglasögonen på Adams keps, DevEd-texten, Kevins gula handske och Adams svarta armärm modelleras i skriptet.
+- Bygg om: `blender.exe -b -P blender/gubbar.py` (alla fyra, `assets/gubbar/<namn>.glb` och provbilder i `blender/prov/`), eller `-- Theo` för en, `-- --prov` för bara provbilder. Utseendet (kroppsform, ansiktsform, hudton, hårfärg, kläder, keps) står i `PERSONER` överst i skriptet.
+- Skelettet (MPFB:s `game_engine`) har den sittande posen som vila. `gubbe.gd` skalar modellen så att huvudet hamnar där de tecknade figurernas sitter, och styr blick, skakning, gest, jubel och 6-7 genom att vrida nacke, huvud och armar. Kast, grädde, krona och droppar sitter på ett osynligt huvud som följer huvudbenet.
+- Figurerna ligger sist i `figurer.gd` (index 14–17), så sparade val av de tecknade figurerna påverkas inte. Varje fil är cirka 3,5 MB (texturer 1024 px).
+
 ## Figurer, kast och 6-7
 - **14 figurer** (`scripts/figurer.gd`, byggs av `scripts/gubbe.gd`). De skiljer sig i:
   - kroppsform: smal, rund, lång, kort

@@ -23,12 +23,17 @@ func _init() -> void:
 	for i in Figurer.antal():
 		var d: Dictionary = Figurer.FIGURER[i]
 		specialer[d.get("special", "")] = true
-		former[d.kropp] = true
+		if d.has("kropp"):
+			former[d.kropp] = true
 		var g := Gubbe.new()
 		root.add_child(g)
 		g.bygg_figur(i)
 		g.position = Vector3(i * 3.0, 0, 0)
-		_ok(g.huvud != null and g.mun != null and g.arm_h != null and g.tomatfleck != null and g.bubbla != null, "%s har alla delar" % d.namn)
+		if d.has("modell"):
+			# realistisk figur: skelett med huvud, armar och händer, och effekterna på huvudet
+			_ok(g.skelett != null and g.huvud != null and g.tomatfleck != null and g.bubbla != null and g.ben.size() == 9 and not g.ben.values().has(-1), "%s har skelett och alla delar" % d.namn)
+		else:
+			_ok(g.huvud != null and g.mun != null and g.arm_h != null and g.tomatfleck != null and g.bubbla != null, "%s har alla delar" % d.namn)
 		g.titta_pa(Vector3(0, 2, -5))
 		g.gest()
 		for typ in ["vattenballong", "tomat", "tarta", "snoboll", "flygplan", "ros", "hjarta", "krona", "konfetti"]:
