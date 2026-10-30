@@ -140,12 +140,16 @@ class Ritare extends Control:
 				var p := o + Vector2(B / 2.0 + pt.x * 58.0, HJ / 2.0 + pt.y * 114.0)
 				_symbol(f, p, 52.0, PI if pt.y > 0.01 else 0.0, col)
 
-	func _index(f: int, v: int, col: Color) -> void:
+	## kant: på klädda kort når bilden in i hörnet, så indexet får en krämvit kant mot bilden.
+	func _index(f: int, v: int, col: Color, kant := false) -> void:
 		# stora index: i handen och i sticket ska valören gå att läsa direkt, särskilt Kn och K
 		var txt: String = K.VALOR_TECKEN[v]
 		var fs := 62
 		if txt.length() > 1:
 			fs = 42
+		if kant:
+			draw_string_outline(font, Vector2(4, 64), txt, HORIZONTAL_ALIGNMENT_CENTER, 58, fs, 12, vit.bg_color)
+			_symbol_lokal(f, Vector2(33, 98), 44.0, vit.bg_color)
 		draw_string(font, Vector2(4, 64), txt, HORIZONTAL_ALIGNMENT_CENTER, 58, fs, col)
 		_symbol_lokal(f, Vector2(33, 98), 32.0, col)
 
@@ -256,14 +260,13 @@ class Ritare extends Control:
 		r.position = Vector2((B - r.size.x) / 2.0, 8)
 		_tf(o)
 		draw_texture_rect(tex, r, false)
-		# lappar över Bellots engelska index (bokstav och litet färgtecken), med de svenska ovanpå
+		# Bellots engelska hörn är borttagna i bilden; de svenska indexen ritas ovanpå
 		for horn in 2:
 			if horn == 0:
 				_tf(o)
 			else:
 				_tf(o + Vector2(B, HJ), PI)
-			draw_rect(Rect2(6, 6, 50, 106), vit.bg_color)
-			_index(f, v, col)
+			_index(f, v, col, true)
 		_tf(o)
 
 	func _kladd(f: int, v: int, col: Color, o: Vector2) -> void:
