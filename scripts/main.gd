@@ -1668,6 +1668,19 @@ func _natmeddelande(d: Dictionary) -> void:
 			nat_nytt.emit()
 		"bordinfo":
 			ui.visa_bordinfo(d)
+		"avslutat":
+			# värden lämnade: tillbaka till menyn med ett meddelande
+			if klient:
+				klient.koppla_fran()
+			online = false
+			online_kor = false
+			ateransluter = false
+			korning += 1
+			inmatning = ""
+			get_tree().paused = false
+			ui.dolj_atgard()
+			_meny_dekor()
+			ui.visa_huvudmeny(str(d.text))
 		"kast":
 			if online_kor and not meny_lage:
 				_kasta(d.fran, d.till, d.vad, false)

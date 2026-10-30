@@ -38,6 +38,7 @@ var font_b: FontVariation
 var tema: Theme
 
 var huvudmeny: Control
+var meny_meddelande: Label
 var installningar: Control
 var regelvy: Control
 var hud: Control
@@ -207,6 +208,26 @@ func _sb(bg: Color, radie: int, kant: Color, kb: int) -> StyleBoxFlat:
 	return s
 
 
+## Textfält på mobilwebben: Godot öppnar inget tangentbord där (det experimentella stödet strular på iPhone).
+## Ett tryck på fältet öppnar i stället webbläsarens egen textruta, och svaret skrivs in i fältet.
+func _mobilt_falt(falt: LineEdit, fraga: String) -> void:
+	if not (OS.has_feature("web") and mobil):
+		return
+	falt.focus_mode = Control.FOCUS_NONE
+	falt.virtual_keyboard_enabled = false
+	falt.gui_input.connect(func(e: InputEvent) -> void:
+		var tryck: bool = (e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT) or (e is InputEventScreenTouch and e.pressed)
+		if not tryck:
+			return
+		falt.accept_event()
+		var svar = JavaScriptBridge.eval("window.prompt(%s, %s)" % [JSON.stringify(fraga), JSON.stringify(falt.text)], true)
+		if svar == null:
+			return
+		var text := str(svar).strip_edges().left(falt.max_length if falt.max_length > 0 else 64)
+		falt.text = text
+		falt.text_changed.emit(text))
+
+
 func _lbl(text: String, storlek := 22, fet := false, farg := KRAM) -> Label:
 	var l := Label.new()
 	l.text = text
@@ -309,6 +330,9 @@ func _bygg_huvudmeny() -> void:
 	v.add_child(titel)
 	var under := _lbl("Svensk poker med stick · spela online med dina vänner", 22 if mobil else 26, false, Color(0.9, 0.86, 0.76))
 	v.add_child(under)
+	meny_meddelande = _lbl("", 22 if mobil else 24, true, Color(1.0, 0.62, 0.5))
+	meny_meddelande.visible = false
+	v.add_child(meny_meddelande)
 	var mell := Control.new()
 	mell.custom_minimum_size = Vector2(0, 6 if mobil else 30)
 	v.add_child(mell)
@@ -322,7 +346,7 @@ func _bygg_huvudmeny() -> void:
 		b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		v.add_child(b)
-	var fot := _lbl("Klädda kort: Byron Knolls Vector Playing Cards (public domain) · Typsnitt Fredoka (SIL OFL)", 16, false, Color(0.7, 0.68, 0.62, 0.7))
+	var fot := _lbl("Klädda kort: David Bellots SVG-cards (LGPL-2.1) · Typsnitt Fredoka (SIL OFL)", 16, false, Color(0.7, 0.68, 0.62, 0.7))
 	huvudmeny.add_child(fot)
 	fot.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	fot.offset_left = 110
@@ -330,9 +354,12 @@ func _bygg_huvudmeny() -> void:
 	fot.offset_bottom = -24
 
 
-func visa_huvudmeny() -> void:
+## meddelande: t.ex. att värden avbröt partiet; visas under rubriken tills menyn visas igen.
+func visa_huvudmeny(meddelande := "") -> void:
 	_gomt_allt()
 	huvudmeny.visible = true
+	meny_meddelande.text = meddelande
+	meny_meddelande.visible = meddelande != ""
 
 
 # ================================================================== inställningar
@@ -381,6 +408,7 @@ func _bygg_installningar() -> void:
 		namn.text = STANDARDNAMN[i]
 		namn.custom_minimum_size = Vector2(170, 0)
 		namn.max_length = 14
+		_mobilt_falt(namn, "Ditt namn")
 		rad.add_child(namn)
 		var typ := OptionButton.new()
 		typ.add_item("Människa")
@@ -1101,12 +1129,14 @@ func _bygg_online() -> void:
 	ga_kod.text_changed.connect(func(t: String) -> void:
 		if t.strip_edges().length() >= 4:
 			fraga_bordinfo.emit(t.strip_edges().to_upper()))
+	_mobilt_falt(ga_kod, "Bordskod")
 	ga_kodrad.add_child(ga_kod)
 	hv.add_child(_lbl("Ditt namn"))
 	ga_namn = LineEdit.new()
 	ga_namn.max_length = 14
 	ga_namn.add_theme_font_size_override("font_size", 26)
 	ga_namn.text_changed.connect(func(_t: String) -> void: ga_eget_namn = true)
+	_mobilt_falt(ga_namn, "Ditt namn")
 	hv.add_child(ga_namn)
 	hv.add_child(_rubrik("Partiet"))
 	ga_info = _lbl("Hämtar bordet …", 19, false, KRAM)

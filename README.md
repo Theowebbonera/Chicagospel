@@ -1,6 +1,6 @@
 # Chicago (Godot 4.7: dator, webb och online)
 
-Svensk Chicago, pokervarianten med byten och stick, vid ett 3D-kortbord med tecknade figurer på platserna. Spelet är bara online: du skapar ett bord och delar länken, och dina vänner väljer sin figur och hamnar i lobbyn. Det finns inga robotar och inget lokalt spel. Det går bara om poäng, utan insatser. Bordet, figurerna, ljuset och ljuden byggs i kod. De klädda korten är Byron Knolls Vector Playing Cards (public domain), med spelets egna svenska hörnindex (Kn, D, K, E).
+Svensk Chicago, pokervarianten med byten och stick, vid ett 3D-kortbord med tecknade figurer på platserna. Spelet är bara online: du skapar ett bord och delar länken, och dina vänner väljer sin figur och hamnar i lobbyn. Det finns inga robotar och inget lokalt spel. Det går bara om poäng, utan insatser. Bordet, figurerna, ljuset och ljuden byggs i kod. De klädda korten är David Bellots SVG-cards (LGPL-2.1), där kungen har krona och skägg, knekten hatt och damen krona och slöja, med spelets egna svenska hörnindex (Kn, D, K, E).
 
 - **Spela:** `spela.bat` · **Editorn:** `redigera.bat` · **Tester:** `testa.bat`
 - **Färdiga byggen:** `build/windows/Chicago.exe` (en fil) och `build/web/` (webbversionen).
@@ -156,9 +156,9 @@ Du skapar kontona själv. Inget är uppladdat härifrån.
   - `Dockerfile`, `render.yaml`, `.dockerignore`.
 - **Verktyg**
   - `verktyg/rita_kort.gd`: kortleken som bild.
-  - `verktyg/rasta_kladda.gd`: rastrerar de klädda korten ur [Vector Playing Cards](https://github.com/hayeah/playing-cards-assets) (`svg-cards/`) till `assets/kort/`. Bara bildramen tas med.
+  - `verktyg/bellot_kladda.py`: gör de klädda korten ur [SVG-cards](https://github.com/htdebeer/SVG-cards) (`png/2x/`) till `assets/kort/`: beskär till ramlinjerna och färgar bakgrunden som kortet. Kortbild.gd lägger svenska index på en lapp över de engelska.
   - `verktyg/figurgalleri.gd`: alla figurer i en bild.
-- Typsnittet är Fredoka under SIL OFL (`assets/OFL.txt`). Bilderna på de klädda korten är Byron Knolls Vector Playing Cards, public domain.
+- Typsnittet är Fredoka under SIL OFL (`assets/OFL.txt`). Bilderna på de klädda korten är David Bellots SVG-cards under LGPL-2.1 (licens och upphovspersoner i `assets/kort/`, källa github.com/htdebeer/SVG-cards). Knolls lek byttes ut eftersom knektar och kungar var för lika.
 
 ## Tester
 `testa.bat` kör alla fyra sviterna headless.

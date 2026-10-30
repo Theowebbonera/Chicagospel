@@ -47,6 +47,7 @@ class Bot extends Node:
 	var steg := 0
 	var kast_mottagna := 0
 	var ogonblick := 0
+	var avslutat := ""
 	var rng := RandomNumberGenerator.new()
 
 	func _init() -> void:
@@ -78,6 +79,8 @@ class Bot extends Node:
 					egna[c] = true
 			"kast":
 				kast_mottagna += 1
+			"avslutat":
+				avslutat = d.text
 			"fel":
 				felmeddelanden.append(d.text)
 				skickat = false
@@ -328,10 +331,37 @@ func _init() -> void:
 		x.k.koppla_fran()
 	await _vanta_pa(func() -> bool: return not server.bord.has(kod), 8.0, "tomt bord städas bort")
 	print("meddelanden inspekterade: %d (varav %d giv-händelser)" % [meddelanden, korthandelser])
+	await _vard_lamnar()
 	# servern som egen process
 	await _extern_server()
 	print("fel: %d" % fel)
 	quit(1 if fel else 0)
+
+
+## Värden lämnar bordet (i lobbyn och mitt i ett parti): bordet stängs och de andra får veta det.
+func _vard_lamnar() -> void:
+	for startat in [false, true]:
+		var v := _bot("Vera")
+		v.k.skicka({"t": "skapa", "namn": "Vera", "antal": 3, "regler": Regler.new().till_dict()})
+		await _vanta_pa(func() -> bool: return v.kod != "", 5.0, "Vera skapar bord")
+		var g := _bot("Gus")
+		g.aktiv = false
+		g.k.skicka({"t": "ga_med", "kod": v.kod, "namn": "Gus"})
+		await _vanta_pa(func() -> bool: return g.plats >= 0, 5.0, "Gus går med")
+		if startat:
+			v.aktiv = false
+			v.k.skicka({"t": "starta"})
+			await _vanta_pa(func() -> bool: return not g.s.is_empty(), 5.0, "partiet startar")
+		var kod := v.kod
+		v.k.skicka({"t": "lamna"})
+		await _vanta_pa(func() -> bool: return g.avslutat != "", 5.0, "Gus får veta att bordet stängts")
+		_ok("Vera" in g.avslutat, "meddelandet nämner värden: '%s'" % g.avslutat)
+		_ok(not server.bord.has(kod), "bordet är borttaget (startat: %s)" % startat)
+		g.felmeddelanden.clear()
+		g.k.skicka({"t": "byt", "kort": []})
+		await _vanta_pa(func() -> bool: return not g.felmeddelanden.is_empty(), 3.0, "Gus sitter inte längre vid bordet")
+		g.k.koppla_fran()
+		v.k.koppla_fran()
 
 
 func _extern_server() -> void:

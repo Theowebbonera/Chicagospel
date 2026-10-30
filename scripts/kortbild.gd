@@ -141,12 +141,13 @@ class Ritare extends Control:
 				_symbol(f, p, 52.0, PI if pt.y > 0.01 else 0.0, col)
 
 	func _index(f: int, v: int, col: Color) -> void:
+		# stora index: i handen och i sticket ska valören gå att läsa direkt, särskilt Kn och K
 		var txt: String = K.VALOR_TECKEN[v]
-		var fs := 54
+		var fs := 62
 		if txt.length() > 1:
-			fs = 44
-		draw_string(font, Vector2(8, 62), txt, HORIZONTAL_ALIGNMENT_CENTER, 52, fs, col)
-		_symbol_lokal(f, Vector2(34, 92), 30.0, col)
+			fs = 42
+		draw_string(font, Vector2(4, 64), txt, HORIZONTAL_ALIGNMENT_CENTER, 58, fs, col)
+		_symbol_lokal(f, Vector2(33, 98), 32.0, col)
 
 	## Valörtecknens platser (kolumn -1..1, rad -1..1) för 2–10.
 	func _pipar(v: int) -> Array:
@@ -242,20 +243,28 @@ class Ritare extends Control:
 		return PackedVector2Array([Vector2(-0.045, 0.12), Vector2(0.045, 0.12), Vector2(0.07, 0.33), Vector2(0.14, 0.45), Vector2(0.22, 0.5), Vector2(-0.22, 0.5), Vector2(-0.14, 0.45), Vector2(-0.07, 0.33)])
 
 	# ------------------------------------------------------------ klädda kort
-	## Klädda kort med Byron Knolls bilder (public domain, assets/kort/, rastrerade av verktyg/rasta_kladda.gd).
+	## Klädda kort med David Bellots bilder (SVG-cards, LGPL-2.1, assets/kort/, gjorda av verktyg/bellot_kladda.py).
+	## Bilden har egna ramlinjer; hörnet där de engelska indexen satt är vitt, och de svenska ritas bredvid.
 	## Saknas bilden ritas den enkla figuren i kod.
 	func _kladd_bild(f: int, v: int, col: Color, o: Vector2) -> void:
 		var tex: Texture2D = bilder.get(f * 100 + v)
 		if tex == null:
 			_kladd(f, v, col, o)
 			return
-		var r := Rect2(60, 62, 180, 296)
+		# bilden fyller kortet med samma proportioner (304 × 469)
+		var r := Rect2(0, 0, (HJ - 16) * 304.0 / 469.0, HJ - 16)
+		r.position = Vector2((B - r.size.x) / 2.0, 8)
 		_tf(o)
 		draw_texture_rect(tex, r, false)
-		ram.border_color = Color(0.12, 0.12, 0.14)
-		ram.set_border_width_all(2)
-		ram.set_corner_radius_all(3)
-		draw_style_box(ram, r)
+		# lappar över Bellots engelska index (bokstav och litet färgtecken), med de svenska ovanpå
+		for horn in 2:
+			if horn == 0:
+				_tf(o)
+			else:
+				_tf(o + Vector2(B, HJ), PI)
+			draw_rect(Rect2(6, 6, 50, 106), vit.bg_color)
+			_index(f, v, col)
+		_tf(o)
 
 	func _kladd(f: int, v: int, col: Color, o: Vector2) -> void:
 		var x0 := 66.0

@@ -404,7 +404,10 @@ func _koppla_fran(id: int, frivilligt := false) -> void:
 	if a.bord != "" and bord.has(a.bord):
 		var b: Dictionary = bord[a.bord]
 		var pl: Dictionary = b.platser[a.plats]
-		if pl.id == id:
+		if frivilligt and pl.id == id and a.plats == b.varde:
+			# värden lämnar (Lämna bordet eller Meny): bordet stängs för alla
+			_avsluta_bord(b, "%s lämnade bordet, så partiet avbröts." % pl.namn)
+		elif pl.id == id:
 			pl.id = -1
 			pl.borta = 0.0
 			# lämnar man före start blir platsen ledig igen
@@ -417,6 +420,20 @@ func _koppla_fran(id: int, frivilligt := false) -> void:
 		a.ws.close()
 		a.bord = ""
 	anslutningar.erase(id)
+
+
+## Stänger bordet: alla andra får "avslutat" och sitter inte längre vid något bord.
+func _avsluta_bord(b: Dictionary, text: String) -> void:
+	for q in b.platser.size():
+		var pl: Dictionary = b.platser[q]
+		if q == b.varde or pl.id < 0 or not anslutningar.has(pl.id):
+			continue
+		_skicka(pl.id, {"t": "avslutat", "text": text})
+		anslutningar[pl.id].bord = ""
+		anslutningar[pl.id].plats = -1
+	bord.erase(b.kod)
+	if logga_ut:
+		print("Bord %s avslutat av värden" % b.kod)
 
 
 # ------------------------------------------------------------------ frånvaro och städning
