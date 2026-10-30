@@ -23,6 +23,7 @@ var chicago_sprack := false
 var poang: Array = []
 var vinnare := -1
 var chicago_tagen: Array = []
+var upp_kort := -1  # 1 upp: uppvänt kort som väntar på svar
 var egen := {}  # spelarens egen vy från servern
 var ko: Array = []  # steg som inte spelats upp än
 var skickat := false  # ett drag är skickat och väntar på svar
@@ -50,6 +51,7 @@ func tillampa(s: Dictionary) -> void:
 	poang = s.poang
 	vinnare = s.vinnare
 	chicago_tagen = s.get("chicago_tagen", [])
+	upp_kort = int(s.get("upp", -1))
 	egen = s.egen
 	skickat = false
 
@@ -92,6 +94,12 @@ func ny_giv() -> void:
 func byt(_p: int, kort: Array) -> bool:
 	skickat = true
 	klient.skicka({"t": "byt", "kort": kort})
+	return true
+
+
+func ta_upp(_p: int, ja: bool) -> bool:
+	skickat = true
+	klient.skicka({"t": "upp", "ja": ja})
 	return true
 
 

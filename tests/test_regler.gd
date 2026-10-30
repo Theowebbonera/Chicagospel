@@ -1,11 +1,12 @@
 extends SceneTree
 ## Kör: Godot --headless --path . --script res://tests/test_regler.gd
-## Handvärdering, jämförelser, bekänna färg, poängräkning, sista sticket, tvåan, Chicago och omblandning.
+## Handvärdering, jämförelser, bekänna färg, poängräkning, sista sticket, tvåan, Chicago, omblandning och 1 upp.
 
 const K := preload("res://scripts/kort.gd")
 const H := preload("res://scripts/handvarde.gd")
 const Motor := preload("res://scripts/motor.gd")
 const Regler := preload("res://scripts/regler.gd")
+const Natverk := preload("res://scripts/natverk.gd")
 
 var fel := 0
 var antal := 0
@@ -41,6 +42,7 @@ func _init() -> void:
 	_sticken()
 	_chicago()
 	_omblandning()
+	_ett_upp()
 	_vyn_ar_hemlig()
 	_husregler()
 	print("%d kontroller, %d fel" % [antal, fel])
@@ -406,6 +408,7 @@ func _bevarade(m) -> bool:
 
 func _omblandning() -> void:
 	var r = _klassisk()
+	r.ett_upp = false
 	var m := Motor.new()
 	m.starta(["A", "B", "C", "D", "E", "F"], r, 11, 0)
 	m.ny_giv()
@@ -424,6 +427,7 @@ func _omblandning() -> void:
 		_ok(h.size() == 5, "alla har fem kort efter omblandning")
 
 	r = _klassisk()
+	r.ett_upp = false
 	r.blanda_om = false
 	m = Motor.new()
 	m.starta(["A", "B", "C", "D", "E", "F"], r, 11, 0)
@@ -439,6 +443,76 @@ func _omblandning() -> void:
 			_ok(m.byt(p, m.hander[p].slice(0, maxb)), "byte inom talongen")
 	_ok(total == 22, "utan omblandning räcker talongen till 22 kort (%d)" % total)
 	_ok(_bevarade(m), "korten bevarade utan omblandning")
+
+
+## 1 upp: byter man ett kort vänds talongens översta kort upp för alla. Spelaren tar det eller får nästa kort dolt.
+func _ett_upp() -> void:
+	var r := Regler.new()
+	_ok(r.ett_upp, "1 upp är standard")
+	r.antal_byten = 1
+	r.poang_byten = 0
+	r.kopstopp_pa = false
+	var m := Motor.new()
+	m.starta(["A", "B", "C"], r, 5, 0)
+	m.ny_giv()
+	m.ta_handelser()
+	# nej tack: det uppvända kortet till slänghögen, nästa kort dolt
+	var p: int = m.tur
+	var slang: int = m.hander[p][0]
+	var topp: int = m.lek.back()
+	_ok(m.byt(p, [slang]), "byt ett kort")
+	_ok(m.upp_kort == topp and m.tur == p and m.hander[p].size() == 4, "1 upp: översta kortet vänds upp och spelaren har kvar turen")
+	_ok(m.max_byte(p) == 0 and not m.byt(p, []), "inget nytt byte medan 1 upp väntar")
+	_ok(not m.ta_upp((p + 1) % 3, true), "bara den som bytte svarar")
+	var h: Array = m.ta_handelser()
+	_ok(h.size() == 1 and h[0].typ == "upp" and h[0].kort == topp, "händelsen upp visar kortet")
+	var annan := (p + 1) % 3
+	var f := Natverk.filtrera(h[0], annan)
+	_ok(f.kort == topp and f.slangda == [-1], "alla ser det uppvända kortet men inte det slängda")
+	_ok(m.vy(annan).upp_kort == topp and Natverk.tillstand(m, annan).upp == topp, "det uppvända kortet finns i allas läge")
+	_ok(_bevarade_upp(m), "alla 52 kort finns medan 1 upp väntar")
+	var dolt: int = m.lek.back()
+	_ok(m.ta_upp(p, false), "tacka nej")
+	_ok(dolt in m.hander[p] and not topp in m.hander[p] and m.hander[p].size() == 5, "nej: spelaren får nästa kort")
+	_ok(topp in m.slangda and slang in m.slangda and slang in m.egna_slangda[p] and m.upp_kort == -1, "nej: det uppvända och det slängda kortet i slänghögen")
+	h = m.ta_handelser()
+	_ok(h.size() == 1 and h[0].typ == "upp_svar" and not h[0].tog, "händelsen upp_svar")
+	_ok(Natverk.filtrera(h[0], annan).nya == [-1] and Natverk.filtrera(h[0], p).nya == [dolt], "det dolda kortet ser bara spelaren")
+	_ok(m.tur == annan, "turen går vidare")
+	_ok(_bevarade_upp(m), "alla 52 kort finns efter nej")
+	# ja tack: kortet till handen, och alla vet redan vilket det är
+	var q: int = m.tur
+	topp = m.lek.back()
+	m.byt(q, [m.hander[q][0]])
+	_ok(m.ta_upp(q, true) and topp in m.hander[q] and m.hander[q].size() == 5, "ja: spelaren tar det uppvända kortet")
+	h = m.ta_handelser()
+	_ok(Natverk.filtrera(h[1], p).nya == [topp], "kortet man tar är offentligt")
+	# två kort byts som vanligt
+	var t: int = m.tur
+	_ok(m.byt(t, m.hander[t].slice(0, 2)) and m.upp_kort == -1, "två kort: inget 1 upp")
+	_ok(m.fas == Motor.Fas.CHICAGO or m.fas == Motor.Fas.STICK, "bytet är klart")
+	# regeln av: ett kort byts direkt
+	r.ett_upp = false
+	m = Motor.new()
+	m.starta(["A", "B"], r, 5, 0)
+	m.ny_giv()
+	p = m.tur
+	_ok(m.byt(p, [m.hander[p][0]]) and m.upp_kort == -1 and m.tur != p, "utan 1 upp byts kortet direkt")
+
+
+func _bevarade_upp(m) -> bool:
+	var sett := {}
+	var alla: Array = m.lek + m.slangda
+	for h in m.hander:
+		alla += h
+	for x in [m.upp_kort, m.upp_slangt]:
+		if x >= 0:
+			alla.append(x)
+	for c in alla:
+		if sett.has(c):
+			return false
+		sett[c] = true
+	return sett.size() == 52
 
 
 ## En spelares vy (det som skickas till klienten) innehåller inte andras händer, talongen eller slängda kort.

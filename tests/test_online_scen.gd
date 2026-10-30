@@ -64,7 +64,10 @@ class Gast extends Node:
 		vy["regler"] = r
 		match int(s.fas):
 			Motor.Fas.BYTE:
-				k.skicka({"t": "byt", "kort": Robot.valj_byte(vy, Robot.MEDEL, rng)})
+				if int(vy.get("upp_kort", -1)) >= 0:
+					k.skicka({"t": "upp", "ja": rng.randf() < 0.5})
+				else:
+					k.skicka({"t": "byt", "kort": Robot.valj_byte(vy, Robot.MEDEL, rng)})
 			Motor.Fas.CHICAGO:
 				k.skicka({"t": "chicago", "ja": Robot.valj_chicago(vy, Robot.MEDEL, rng)})
 			Motor.Fas.STICK:
@@ -133,6 +136,8 @@ func _init() -> void:
 			match main.inmatning:
 				"byte":
 					main.beslut.emit("byt")
+				"upp":
+					main.beslut.emit(randf() < 0.5)
 				"chicago":
 					main.beslut.emit(false)
 				"spela":
@@ -147,6 +152,8 @@ func _init() -> void:
 			kontroller += 1
 			if c in main.stick_vis:
 				continue
+			if c == main.upp_vis:
+				continue  # 1 upp: alla ska se kortet
 			if main.min_plats < main.vhand.size() and c in main.vhand[main.min_plats]:
 				# måste verkligen vara Theos kort enligt servern (eller nyss spelat)
 				if not c in m.hander[main.min_plats] and not _spelat(m, c):

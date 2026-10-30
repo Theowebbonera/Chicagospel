@@ -103,6 +103,14 @@ static func filtrera(e: Dictionary, p: int) -> Dictionary:
 					ny.append(-1)
 				u.slangda = s
 				u.nya = ny
+		"upp":
+			# det uppvända kortet är offentligt, det slängda inte
+			if e.spelare != p:
+				u.slangda = [-1]
+		"upp_svar":
+			# tackar man nej får man ett dolt kort; det man tar är det alla redan sett
+			if e.spelare != p and not e.tog:
+				u.nya = [-1]
 		"vinst", "giv_slut":
 			pass
 	return u
@@ -128,6 +136,7 @@ static func tillstand(m, p: int) -> Dictionary:
 		"vinnare": m.vinnare,
 		"chicago_tagen": m.chicago_tagen.duplicate(),
 		"lek": m.lek.size(),
-		"slang": m.slangda.size(),
+		"slang": m.slangda.size() + (1 if m.upp_slangt >= 0 else 0),
+		"upp": m.upp_kort,
 		"egen": vy,
 	}

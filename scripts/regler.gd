@@ -33,6 +33,7 @@ var max_byte := 5
 var kopstopp_pa := true
 var kopstopp := 41  # den som har minst så här många poäng får inte byta
 var blanda_om := true
+var ett_upp := true  # byter man ett kort vänds talongens översta kort upp
 # --- sticken
 var stick_poang := 2
 var tvaa_bonus := true
@@ -76,6 +77,7 @@ const LISTA := [
 	{"namn": "max_byte", "text": "Högst antal kort per byte", "typ": "tal", "min": 1, "max": 5},
 	{"namn": "kopstopp_pa", "text": "Köpstopp", "typ": "bool", "hjalp": "Den som har nått gränsen nedan får inte byta kort utan står över bytena."},
 	{"namn": "kopstopp", "text": "Köpstopp vid poäng", "typ": "tal", "min": 1, "max": 500},
+	{"namn": "ett_upp", "text": "1 upp", "typ": "bool", "hjalp": "Byter man bara ett kort vänds talongens översta kort upp så att alla ser det. Man väljer att ta det, eller att lägga det i slänghögen och få nästa kort dolt."},
 	{"namn": "blanda_om", "text": "Blanda om slänghögen när talongen tar slut", "typ": "bool", "hjalp": "Av: man kan bara byta så många kort som finns kvar i talongen."},
 	{"grupp": "Sticken"},
 	{"namn": "stick_poang", "text": "Sista sticket", "typ": "tal", "min": 0, "max": 100, "hjalp": "Poäng till den som tar sista sticket."},

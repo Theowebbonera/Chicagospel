@@ -45,6 +45,7 @@ var betraktare := 0
 var visad := true
 var vhand: Array = []
 var lek_vis: Array = []
+var upp_vis := -1  # 1 upp: kortet som ligger uppvänt bredvid talongen
 var slang_vis: Array = []
 var stick_vis: Array = []
 var hogar: Array = []
@@ -370,6 +371,15 @@ func _lek_tf(k: int, g: int) -> Transform3D:
 	return Transform3D(b, _lekpos(g) + Vector3.UP * (0.012 + k * LYFT))
 
 
+## 1 upp: det uppvända kortet ligger mitt på bordet, stort och rättvänt för den som tittar (som korten i sticket).
+func _upp_tf() -> Transform3D:
+	var sk := _stick_skala()
+	var luta := 0.38
+	var b := Basis(_t(betraktare), luta) * _bas(betraktare, true)
+	var lyft := Kort3D.HOJD * sk * 0.5 * sin(luta) + 0.03
+	return Transform3D(b.scaled(Vector3(sk, sk, sk)), Vector3.UP * lyft)
+
+
 func _slang_tf(k: int) -> Transform3D:
 	var g := vis_givare
 	var jit := Vector3(sin(k * 3.7), 0, cos(k * 5.1)) * 0.07
@@ -630,6 +640,9 @@ func _tur_inre(id: int) -> void:
 	ljud.spela("tur", 1.0, -6.0)
 	match motor.fas:
 		Motor.Fas.BYTE:
+			if motor.upp_kort >= 0:
+				await _upp_val(p, id)
+				return
 			valda = []
 			max_val = motor.max_byte(p)
 			inmatning = "byte"
@@ -676,6 +689,22 @@ func _tur_inre(id: int) -> void:
 			motor.spela(p, int(c))
 
 
+## 1 upp: ta det uppvända kortet, eller få nästa kort från talongen som ingen annan ser.
+func _upp_val(p: int, id: int) -> void:
+	var u: int = motor.upp_kort
+	inmatning = "upp"
+	var med := H.varde(vhand[p] + [u], regler.ess_lag)
+	ui.visa_atgard("1 upp: %s" % K.namn(u), "Med kortet har du: %s.
+Tackar du nej läggs det i slänghögen och du får nästa kort i talongen, som ingen annan ser." % med.namn,
+		[["Ta %s" % K.namn(u), true, true], ["Nej, ge mig ett dolt", false]])
+	var ja = await beslut
+	if id != korning:
+		return
+	inmatning = ""
+	ui.dolj_atgard()
+	motor.ta_upp(p, bool(ja))
+
+
 func _forbered_manniska(p: int, _id: int) -> void:
 	if betraktare != p or not visad:
 		betraktare = p
@@ -700,6 +729,8 @@ func _byte_ui(p: int) -> void:
 		hand += " (%d p om den är bäst)" % pts
 	hand += "\nKlicka på korten du vill byta (högst %d)." % max_val
 	var t := "Byt %d kort" % valda.size() if valda.size() > 0 else "Behåll alla"
+	if valda.size() == 1 and regler.ett_upp:
+		t = "Byt 1 kort (1 upp)"
 	ui.visa_atgard(info, hand, [[t, "byt", true]])
 
 
@@ -1294,6 +1325,10 @@ func _handelse(e: Dictionary, id: int) -> void:
 			await _vanta(0.9)
 		"byte":
 			await _byte_anim(e, id)
+		"upp":
+			await _upp_anim(e, id)
+		"upp_svar":
+			await _upp_svar_anim(e, id)
 		"poang":
 			await _poang_anim(e, id)
 		"ingen_poang":
@@ -1401,6 +1436,7 @@ func _blanda_anim(g: int, id: int) -> void:
 		kort[c].satt_dimmad(false)
 	lek_vis = K.ny_lek()
 	K.blanda(lek_vis, rng)
+	upp_vis = -1
 	slang_vis = []
 	stick_vis = []
 	# samla ihop alla kort till givaren
@@ -1481,6 +1517,67 @@ func _byte_anim(e: Dictionary, id: int) -> void:
 		vhand[p] = K.sortera_hand(vhand[p])
 		_layout_sats(p, 0.3, 0.1)
 		await _vanta(0.2)
+
+
+## 1 upp: det slängda kortet till slänghögen, sedan vänds talongens översta kort upp så att alla ser det.
+func _upp_anim(e: Dictionary, id: int) -> void:
+	var p: int = e.spelare
+	var c: int = e.slangda[0]
+	var namn: String = spelare[p].namn
+	vhand[p].erase(c)
+	slang_vis.append(c)
+	kort[c].flyg(_slang_tf(slang_vis.size() - 1), 0.36 * tf, 0.4)
+	_popup(p, "1 upp", UI.KRAM)
+	_gest(p)
+	bytes_info[p] = "1 upp"
+	ljud.spela("glid", 1.2)
+	_tavla()
+	_layout_sats(p, 0.3)
+	await _vanta(0.42)
+	if id != korning:
+		return
+	var u: int = e.kort
+	_fran_lek(u)
+	upp_vis = u
+	kort[u].flyg(_upp_tf(), 0.45 * tf, 0.6)
+	ljud.spela("kort", 1.2)
+	ui.logga("%s byter ett kort: 1 upp, %s." % [namn, K.namn(u)])
+	if p != betraktare:
+		ui.visa_banner("1 upp: %s" % K.namn(u), "%s väljer om kortet ska tas" % namn, UI.KRAM, 1.0)
+	await _vanta(0.8)
+
+
+## 1 upp: spelaren tar det uppvända kortet, eller så hamnar det i slänghögen och spelaren får ett dolt kort.
+func _upp_svar_anim(e: Dictionary, id: int) -> void:
+	var p: int = e.spelare
+	var u: int = e.kort
+	var namn: String = spelare[p].namn
+	upp_vis = -1
+	bytes_info[p] = "bytte 1"
+	if e.tog:
+		vhand[p].append(u)
+		ui.logga("%s tar %s." % [namn, K.namn(u)])
+		ljud.spela("kort", 1.0, -3.0)
+	else:
+		slang_vis.append(u)
+		kort[u].flyg(_slang_tf(slang_vis.size() - 1), 0.36 * tf, 0.4)
+		ui.logga("%s tackar nej till %s och får ett dolt kort." % [namn, K.namn(u)])
+		ljud.spela("glid", 1.2)
+		await _vanta(0.4)
+		if id != korning:
+			return
+		var c: int = e.nya[0]
+		_fran_lek(c)
+		vhand[p].append(c)
+		ljud.spela("kort", 1.0, -3.0)
+	_tavla()
+	_layout_sats(p, 0.3, 0.45)
+	await _vanta(0.4)
+	if id != korning:
+		return
+	vhand[p] = K.sortera_hand(vhand[p])
+	_layout_sats(p, 0.3, 0.1)
+	await _vanta(0.2)
 
 
 func _poang_anim(e: Dictionary, id: int) -> void:
@@ -1835,6 +1932,17 @@ func _tolka_online(e: Dictionary) -> void:
 			else:
 				for c in e.nya:
 					_hamta_till(c, lek_vis)
+		"upp":
+			# det uppvända kortet hämtas till talongen först, sedan väljs en anonym nod som det slängda kortet
+			_hamta_till(e.kort, lek_vis)
+			if e.spelare != min_plats:
+				e.slangda = [vhand[e.spelare][0]]
+		"upp_svar":
+			if not e.tog:
+				if e.spelare != min_plats:
+					e.nya = [lek_vis.back()]
+				else:
+					_hamta_till(e.nya[0], lek_vis)
 		"spela":
 			if e.spelare != min_plats:
 				_hamta_till(e.kort, vhand[e.spelare])
@@ -1901,6 +2009,9 @@ func _bygg_ogonblick(d: Dictionary) -> void:
 	for t in tagna:
 		for c in t[1]:
 			anv[c] = true
+	upp_vis = int(s.get("upp", -1))
+	if upp_vis >= 0:
+		anv[upp_vis] = true
 	var pool: Array = []
 	for c in 52:
 		if not anv.has(c):
@@ -1919,6 +2030,8 @@ func _bygg_ogonblick(d: Dictionary) -> void:
 		kort[lek_vis[k]].satt_direkt(_lek_tf(k, vis_givare))
 	for k in slang_vis.size():
 		kort[slang_vis[k]].satt_direkt(_slang_tf(k))
+	if upp_vis >= 0:
+		kort[upp_vis].satt_direkt(_upp_tf())
 	for i in stick_par.size():
 		kort[stick_par[i][1]].satt_direkt(_stick_tf(stick_par[i][0], i))
 	for t in tagna:

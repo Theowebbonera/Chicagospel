@@ -115,7 +115,7 @@ func _ta_emot(id: int, text: String) -> void:
 						b.regler.fran_dict(d.regler)
 						b.regler.malpoang = clampi(b.regler.malpoang, 5, 500)
 					_skicka_lobby(b)
-				"byt", "chicago", "spela":
+				"byt", "upp", "chicago", "spela":
 					_drag(id, b, p, d)
 				"kasta":
 					_kasta(id, b, p, d)
@@ -334,6 +334,10 @@ func _sanda_steg(b: Dictionary) -> void:
 				paus += 0.7
 			"byte":
 				paus += 1.3
+			"upp":
+				paus += 1.4
+			"upp_svar":
+				paus += 1.0
 			"poang":
 				paus += 2.2
 			"ingen_poang", "lika":
@@ -369,6 +373,8 @@ func _drag(id: int, b: Dictionary, p: int, d: Dictionary) -> void:
 	match str(d.t):
 		"byt":
 			ok = m.fas == Motor.Fas.BYTE and d.get("kort") is Array and m.byt(p, d.kort)
+		"upp":
+			ok = m.fas == Motor.Fas.BYTE and m.ta_upp(p, bool(d.get("ja", false)))
 		"chicago":
 			ok = m.fas == Motor.Fas.CHICAGO and m.ropa_chicago(p, bool(d.get("ja", false)))
 		"spela":
@@ -467,7 +473,7 @@ func _tick(b: Dictionary, dt: float) -> void:
 	if m.fas != Motor.Fas.BYTE and m.fas != Motor.Fas.CHICAGO and m.fas != Motor.Fas.STICK:
 		return
 	# Är den som har turen frånkopplad länge gör servern ett enkelt drag, så att partiet inte står still:
-	# inget byte, ingen Chicago, och det lägsta tillåtna kortet i sticket. Ingen robot, ingen taktik.
+	# inget byte (vid 1 upp tar den kortet), ingen Chicago, och det lägsta tillåtna kortet i sticket. Ingen robot, ingen taktik.
 	var p: int = m.tur
 	var pl: Dictionary = b.platser[p]
 	var franvarande: bool = (pl.id < 0 or not anslutningar.has(pl.id)) and pl.borta > franvaro_auto
@@ -475,7 +481,10 @@ func _tick(b: Dictionary, dt: float) -> void:
 		return
 	match m.fas:
 		Motor.Fas.BYTE:
-			m.byt(p, [])
+			if m.upp_kort >= 0:
+				m.ta_upp(p, true)
+			else:
+				m.byt(p, [])
 		Motor.Fas.CHICAGO:
 			m.ropa_chicago(p, false)
 		Motor.Fas.STICK:

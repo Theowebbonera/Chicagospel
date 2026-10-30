@@ -35,6 +35,8 @@ var gjort := 0  # antal spelare som har agerat i nuvarande runda
 var byte_nr := 0  # 1-baserat under bytena
 var bytes_antal: Array = []  # [byte][spelare] = antal bytta kort (offentligt)
 var star_over: Array = []  # per spelare: står över bytena (köpstopp) – offentligt
+var upp_kort := -1  # 1 upp: kortet som vänts upp och väntar på att spelaren som har turen tar det eller inte (offentligt)
+var upp_slangt := -1  # 1 upp: kortet spelaren slängde, läggs i slänghögen när valet är gjort
 var chicago := -1
 var chicago_sprack := false
 var stick_nr := 0
@@ -132,6 +134,8 @@ func ny_giv(fast_lek: Array = []) -> void:
 	stick_nr = 0
 	byte_nr = 0
 	bytes_antal = []
+	upp_kort = -1
+	upp_slangt = -1
 	vantande = []
 	_h({"typ": "blanda", "givare": givare, "giv": giv_nr})
 	for runda in 5:
@@ -195,14 +199,30 @@ func _efter_byteomgang() -> void:
 
 
 func max_byte(p: int) -> int:
-	if fas != Fas.BYTE or har_kopstopp(p):
+	if fas != Fas.BYTE or har_kopstopp(p) or upp_kort >= 0:
 		return 0
-	var finns: int = lek.size() + (slangda.size() if regler.blanda_om else 0)
-	return mini(mini(regler.max_byte, hander[p].size()), finns)
+	return mini(mini(regler.max_byte, hander[p].size()), _kort_att_dra())
+
+
+## Kort som går att dra: talongen, och slänghögen om den blandas om.
+func _kort_att_dra() -> int:
+	return lek.size() + (slangda.size() if regler.blanda_om else 0)
+
+
+## Översta kortet i talongen. Är talongen slut blandas slänghögen (utan kort som just slängts) till en ny.
+func _dra() -> int:
+	if lek.is_empty():
+		lek = slangda
+		slangda = []
+		K.blanda(lek, rng)
+		for q in n:
+			egna_slangda[q] = []
+		_h({"typ": "omblandning", "antal": lek.size()})
+	return lek.pop_back()
 
 
 func byt(p: int, kort: Array) -> bool:
-	if fas != Fas.BYTE or p != tur:
+	if fas != Fas.BYTE or p != tur or upp_kort >= 0:
 		return false
 	if kort.size() > max_byte(p):
 		return false
@@ -211,31 +231,53 @@ func byt(p: int, kort: Array) -> bool:
 		if not c in hander[p] or sett.has(c):
 			return false
 		sett[c] = true
+	# 1 upp: ett kort byts och det finns två att dra (det uppvända och ett dolt om man inte vill ha det)
+	if kort.size() == 1 and regler.ett_upp and _kort_att_dra() >= 2:
+		hander[p].erase(kort[0])
+		upp_slangt = kort[0]
+		upp_kort = _dra()
+		bytes_antal[byte_nr - 1][p] = 1
+		_h({"typ": "upp", "spelare": p, "slangda": kort.duplicate(), "kort": upp_kort, "nr": byte_nr})
+		return true
 	for c in kort:
 		hander[p].erase(c)
 	var nya: Array = []
 	for i in kort.size():
-		if lek.is_empty():
-			# talongen är slut: blanda slänghögen (utan kort som just slängts) till en ny talong
-			lek = slangda
-			slangda = []
-			K.blanda(lek, rng)
-			for q in n:
-				egna_slangda[q] = []
-			_h({"typ": "omblandning", "antal": lek.size()})
-		nya.append(lek.pop_back())
+		nya.append(_dra())
 	slangda.append_array(kort)
 	egna_slangda[p].append_array(kort)
 	hander[p].append_array(nya)
 	bytes_antal[byte_nr - 1][p] = kort.size()
 	_h({"typ": "byte", "spelare": p, "slangda": kort.duplicate(), "nya": nya, "nr": byte_nr})
+	_nasta_byte()
+	return true
+
+
+## 1 upp: spelaren tar det uppvända kortet (ja) eller lägger det i slänghögen och får nästa kort dolt (nej).
+func ta_upp(p: int, ja: bool) -> bool:
+	if fas != Fas.BYTE or p != tur or upp_kort < 0:
+		return false
+	var u := upp_kort
+	var ny := u if ja else _dra()
+	upp_kort = -1
+	hander[p].append(ny)
+	slangda.append(upp_slangt)
+	egna_slangda[p].append(upp_slangt)
+	if not ja:
+		slangda.append(u)
+	upp_slangt = -1
+	_h({"typ": "upp_svar", "spelare": p, "tog": ja, "kort": u, "nya": [ny], "nr": byte_nr})
+	_nasta_byte()
+	return true
+
+
+func _nasta_byte() -> void:
 	gjort += 1
 	if gjort < n:
 		tur = (tur + 1) % n
 		_hoppa_over_kopstopp()
-		return true
+		return
 	_efter_byteomgang()
-	return true
 
 
 # ------------------------------------------------------------------ poäng
@@ -537,6 +579,7 @@ func vy(p: int) -> Dictionary:
 		"poangsatts": fas == Fas.BYTE and (poangsatts_bytet() or regler.poang_efter_stick),
 		"byten_kvar": regler.antal_byten - byte_nr if fas == Fas.BYTE else 0,
 		"max_byte": max_byte(p),
+		"upp_kort": upp_kort,
 		"kopstopp": har_kopstopp(p),
 		"star_over": star_over.duplicate(),
 		"bytes_antal": bytes_antal.duplicate(true),

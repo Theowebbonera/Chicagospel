@@ -18,6 +18,7 @@ var server
 var fel := 0
 var meddelanden := 0
 var korthandelser := 0
+var upp_svar := 0  # 1 upp-svar som setts
 
 
 func _ok(v: bool, t: String) -> void:
@@ -96,7 +97,10 @@ class Bot extends Node:
 		vy["regler"] = r
 		match int(s.fas):
 			Motor.Fas.BYTE:
-				k.skicka({"t": "byt", "kort": Robot.valj_byte(vy, Robot.MEDEL, rng)})
+				if int(vy.get("upp_kort", -1)) >= 0:
+					k.skicka({"t": "upp", "ja": rng.randf() < 0.5})
+				else:
+					k.skicka({"t": "byt", "kort": Robot.valj_byte(vy, Robot.MEDEL, rng)})
 			Motor.Fas.CHICAGO:
 				k.skicka({"t": "chicago", "ja": Robot.valj_chicago(vy, Robot.MEDEL, rng)})
 			Motor.Fas.STICK:
@@ -126,6 +130,18 @@ func kolla_integritet(b: Bot, d: Dictionary) -> void:
 					else:
 						for c in e.slangda + e.nya:
 							_ok(c == -1, "%s fick se ett kort i plats %d:s byte" % [b.namn, e.spelare])
+				"upp":
+					# 1 upp: det uppvända kortet är offentligt, det slängda bara för den som slängde
+					b.offentliga[e.kort] = true
+					if e.spelare != b.plats:
+						_ok(e.slangda == [-1], "%s fick se plats %d:s slängda kort vid 1 upp" % [b.namn, e.spelare])
+				"upp_svar":
+					upp_svar += 1
+					if e.spelare == b.plats:
+						for c in e.nya:
+							b.egna[c] = true
+					elif not e.tog:
+						_ok(e.nya == [-1], "%s fick se det dolda kortet efter 1 upp" % b.namn)
 				"spela":
 					b.offentliga[e.kort] = true
 	if d.t == "ogonblick":
@@ -146,6 +162,8 @@ func kolla_integritet(b: Bot, d: Dictionary) -> void:
 				if q == b.plats:
 					continue
 				for c in bo.motor.hander[q]:
+					if b.offentliga.has(c):
+						continue  # taget vid 1 upp: alla såg det
 					_ok(not _innehaller_kort(d, c, b), "%s fick %s som ligger hos plats %d" % [b.namn, K.namn(c), q])
 		for c in eg.hand:
 			_ok(b.egna.has(c), "%s: kort i egen hand som aldrig getts till spelaren" % b.namn)
@@ -160,6 +178,8 @@ func _innehaller_kort(d: Dictionary, c: int, b: Bot) -> bool:
 			if e.typ == "giv" and e.kort == c:
 				return true
 			if e.typ == "byte" and (c in e.nya or c in e.slangda):
+				return true
+			if (e.typ == "upp" and c in e.slangda) or (e.typ == "upp_svar" and c in e.nya):
 				return true
 	var eg: Dictionary = d.s.egen
 	return c in eg.hand or c in eg.tillatna or c in eg.egna_slangda
@@ -330,7 +350,8 @@ func _init() -> void:
 	for x in [anna, bo2, cia, sen, fel_bot, titt, dubbel]:
 		x.k.koppla_fran()
 	await _vanta_pa(func() -> bool: return not server.bord.has(kod), 8.0, "tomt bord städas bort")
-	print("meddelanden inspekterade: %d (varav %d giv-händelser)" % [meddelanden, korthandelser])
+	print("meddelanden inspekterade: %d (varav %d giv-händelser, %d svar på 1 upp)" % [meddelanden, korthandelser, upp_svar])
+	_ok(upp_svar > 0, "1 upp spelades online")
 	await _vard_lamnar()
 	# servern som egen process
 	await _extern_server()
