@@ -237,9 +237,9 @@ func _init() -> void:
 	await _vanta_pa(func() -> bool: return not dubbel.felmeddelanden.is_empty(), 3.0, "dubbel figur avvisas")
 	_ok(dubbel.plats < 0, "dubbel figur gav ingen plats")
 	var bo := _bot("Bo")
-	bo.k.skicka({"t": "ga_med", "kod": anna.kod.to_lower(), "namn": "Bo", "figur": 5})
+	bo.k.skicka({"t": "ga_med", "kod": anna.kod.to_lower(), "namn": "Bo", "figur": 1})
 	var cia := _bot("Cia")
-	cia.k.skicka({"t": "ga_med", "kod": anna.kod, "namn": "Cia", "figur": 7})
+	cia.k.skicka({"t": "ga_med", "kod": anna.kod, "namn": "Cia", "figur": 2})
 	await _vanta_pa(func() -> bool: return bo.plats >= 0 and cia.plats >= 0, 5.0, "Bo och Cia går med")
 	_ok(bo.plats == 1 and cia.plats == 2, "platser 1 och 2")
 	# fel bordskod
@@ -251,10 +251,10 @@ func _init() -> void:
 	cia.k.skicka({"t": "plats", "plats": 3, "typ": "robot", "niva": 1})
 	cia.k.skicka({"t": "regler", "regler": {"malpoang": 99}})
 	cia.k.skicka({"t": "fyll"})
-	cia.k.skicka({"t": "figur", "figur": 5})
+	cia.k.skicka({"t": "figur", "figur": 1})
 	await _vanta_pa(func() -> bool: return cia.felmeddelanden.size() >= 4, 3.0, "icke-värd och robotmeddelanden avvisas")
 	_ok(server.bord[anna.kod].platser[3].typ == "tom" and server.bord[anna.kod].regler.malpoang == 60, "icke-värd ändrade inget")
-	_ok(server.bord[anna.kod].platser[2].figur == 7, "Cia fick inte ta Bos figur")
+	_ok(server.bord[anna.kod].platser[2].figur == 2, "Cia fick inte ta Bos figur")
 	# värden kan ändra reglerna före start
 	var r2 := Regler.new()
 	r2.malpoang = 60
@@ -280,7 +280,7 @@ func _init() -> void:
 	await _vanta_pa(func() -> bool: return not anna.s.is_empty() and int(anna.s.fas) == Motor.Fas.BYTE, 10.0, "partiet startar")
 	# bara de tre som gick med spelar, med sina figurer och samma platser
 	var figs: Array = server.bord[anna.kod].platser.map(func(x): return x.figur)
-	_ok(figs == [3, 5, 7], "tre spelare med sina figurer efter start: %s" % [figs])
+	_ok(figs == [3, 1, 2], "tre spelare med sina figurer efter start: %s" % [figs])
 	_ok(server.bord[anna.kod].motor.n == 3 and anna.plats == 0 and bo.plats == 1 and cia.plats == 2, "lediga platser borttagna, platserna kvar")
 	# otillåtna drag: fel tur och kort man inte har
 	var m = server.bord[anna.kod].motor

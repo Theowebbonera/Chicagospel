@@ -1,6 +1,6 @@
 # Chicago (Godot 4.7: dator, webb och online)
 
-Svensk Chicago, pokervarianten med byten och stick, vid ett 3D-kortbord med tecknade figurer på platserna. Spelet är bara online: du skapar ett bord och delar länken, och dina vänner väljer sin figur och hamnar i lobbyn. Det finns inga robotar och inget lokalt spel. Det går bara om poäng, utan insatser. Bordet, figurerna, ljuset och ljuden byggs i kod. De klädda korten är David Bellots SVG-cards (LGPL-2.1), där kungen har krona och skägg, knekten hatt och damen krona och slöja, med spelets egna svenska hörnindex (Kn, D, K, E).
+Svensk Chicago, pokervarianten med byten och stick, vid ett 3D-kortbord med fyra realistiska figurer (Kevin, Theo, Lukas och Adam) på platserna. Spelet är bara online: du skapar ett bord och delar länken, och dina vänner väljer sin figur och hamnar i lobbyn. Det finns inga robotar och inget lokalt spel. Det går bara om poäng, utan insatser. Bordet, figurerna, ljuset och ljuden byggs i kod. De klädda korten är David Bellots SVG-cards (LGPL-2.1), där kungen har krona och skägg, knekten hatt och damen krona och slöja, med spelets egna svenska hörnindex (Kn, D, K, E).
 
 - **Spela:** `spela.bat` · **Editorn:** `redigera.bat` · **Tester:** `testa.bat`
 - **Färdiga byggen:** `build/windows/Chicago.exe` (en fil) och `build/web/` (webbversionen).
@@ -39,20 +39,12 @@ Allt går att ändra under **Skapa bord**. Knappen **Klassiska regler** ger de v
 ## Realistiska figurer (Kevin, Theo, Lukas, Adam)
 - Fyra figurer efter Theos bild från fjälltoppen, byggda i Blender 4.5 med MPFB (MakeHuman, CC0): kropp, hud, hår och kläder från MPFB, kläderna omfärgade efter bilden. Kepsar, glasögon, solglasögonen på Adams keps, DevEd-texten, Kevins gula handske och Adams svarta armärm modelleras i skriptet.
 - Bygg om: `blender.exe -b -P blender/gubbar.py` (alla fyra, `assets/gubbar/<namn>.glb` och provbilder i `blender/prov/`), eller `-- Theo` för en, `-- --prov` för bara provbilder. Utseendet (kroppsform, ansiktsform, hudton, hårfärg, kläder, keps) står i `PERSONER` överst i skriptet.
-- Skelettet (MPFB:s `game_engine`) har den sittande posen som vila. `gubbe.gd` skalar modellen så att huvudet hamnar där de tecknade figurernas sitter, och styr blick, skakning, gest, jubel och 6-7 genom att vrida nacke, huvud och armar. Kast, grädde, krona och droppar sitter på ett osynligt huvud som följer huvudbenet.
-- Figurerna ligger sist i `figurer.gd` (index 14–17), så sparade val av de tecknade figurerna påverkas inte. Varje fil är cirka 3,5 MB (texturer 1024 px).
+- Skelettet (MPFB:s `game_engine`) har den sittande posen som vila. `gubbe.gd` skalar modellen till bordets mått och styr blick, skakning, gest, jubel och 6-7 genom att vrida nacke, huvud och armar. Kast, grädde, krona och droppar sitter på ett osynligt huvud som följer huvudbenet.
+- De tecknade figurerna (Greta, Bosse, robot, hund, katt med flera) är borttagna; `figurer.gd` har bara de fyra. Varje fil är cirka 3,5 MB (texturer 1024 px).
 
 ## Figurer, kast och 6-7
-- **14 figurer** (`scripts/figurer.gd`, byggs av `scripts/gubbe.gd`). De skiljer sig i:
-  - kroppsform: smal, rund, lång, kort
-  - hudton
-  - frisyr och hårfärg
-  - ögon, mun och ögonbryn
-  - kläder: tröja, kavaj, hoodie, randig, kockrock, väst
-  - accessoarer: hatt, keps, glasögon, solglasögon, skägg, mustasch, hörlurar, fluga, mössa, krona, piratlapp, kockmössa, cowboyhatt
-
-  Extrafigurerna är **Robot R7, Kapten Jack (pirat), Kocken, Cowboy-Kalle, Hunden Doris och Katten Måns**.
-- Värden väljer figur under **Skapa bord**, och den som går med väljer på figurskärmen (snurrande förhandsvisning, Föregående och Nästa). Figuren kan bytas i lobbyn. Den som inte har valt får en figur som inte redan är tagen. Valet sparas i `user://chicago.cfg` och skickas via servern.
+- **4 figurer** (`scripts/figurer.gd`, byggs av `scripts/gubbe.gd`), se ovan.
+- Värden väljer figur under **Skapa bord**, och den som går med väljer på figurskärmen (snurrande förhandsvisning, Föregående och Nästa). Figuren kan bytas i lobbyn. Den som inte har valt får en figur som inte redan är tagen. Är alla fyra tagna (fem eller sex spelare) får man ta en som redan används. Valet sparas i `user://chicago.cfg` och skickas via servern.
 - Figurerna andas, tittar mot den som har turen, gestikulerar när de spelar, jublar vid poäng och sitter bakom bordskanten så att de inte skymmer korten.
 - **Kastmenyn**
   - Kasta: vattenballong, tomat, gräddtårta, snöboll, pappersflygplan.
@@ -74,7 +66,7 @@ Allt går att ändra under **Skapa bord**. Knappen **Klassiska regler** ger de v
 4. Tappar någon anslutningen mitt i partiet ansluter klienten själv igen med en token som är sparad lokalt (`user://chicago_online.cfg`). Samma länk fungerar också. Är spelaren borta längre än 45 sekunder när det är dennes tur gör servern ett enkelt drag (inget byte, ingen Chicago, lägsta tillåtna kortet), så att partiet inte står still.
 5. Bord utan anslutna människor städas bort efter 10 minuter.
 
-Servern (`scripts/server.gd`) är auktoritativ med `motor.gd` som enda sanning. Den blandar, ger och avgör stick och poäng. Varje klient får bara sin egen hand och det offentliga. Andras kort skickas aldrig: i givar och byten kommer de som `-1` (`scripts/natverk.gd`, `filtrera`/`tillstand`). Klienten visar dem med anonyma kortnoder som byter identitet osynligt när ett kort spelas ut. Allt valideras på servern: otillåtna drag, drag i fel tur och för tidiga kast. Bara värdens anslutning, alltså värdens token, får ändra regler och starta. Två spelare får inte ha samma figur. Att gå med i ett pågående parti kräver token. Tappar värden anslutningen behålls värdskapet via token vid återanslutning. Före anslutning kan klienten fråga om ett bord (`bordinfo`) och får regler, värd och tagna figurer. Vid start packas platserna ihop, och var och en får sin plats på nytt (`valkommen`). Protokollet är JSON över WebSocket.
+Servern (`scripts/server.gd`) är auktoritativ med `motor.gd` som enda sanning. Den blandar, ger och avgör stick och poäng. Varje klient får bara sin egen hand och det offentliga. Andras kort skickas aldrig: i givar och byten kommer de som `-1` (`scripts/natverk.gd`, `filtrera`/`tillstand`). Klienten visar dem med anonyma kortnoder som byter identitet osynligt när ett kort spelas ut. Allt valideras på servern: otillåtna drag, drag i fel tur och för tidiga kast. Bara värdens anslutning, alltså värdens token, får ändra regler och starta. Två spelare får inte ha samma figur, så länge det finns lediga figurer. Att gå med i ett pågående parti kräver token. Tappar värden anslutningen behålls värdskapet via token vid återanslutning. Före anslutning kan klienten fråga om ett bord (`bordinfo`) och får regler, värd och tagna figurer. Vid start packas platserna ihop, och var och en får sin plats på nytt (`valkommen`). Protokollet är JSON över WebSocket.
 
 **Serveradress:** den sätts i `scripts/natverk.gd`.
 - `SERVER_LOKAL` (`ws://localhost:9080`) används när spelet körs från editorn och när webbsidan körs över http, till exempel lokalt.

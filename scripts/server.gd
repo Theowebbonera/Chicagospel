@@ -233,11 +233,14 @@ func _bordinfo(id: int, d: Dictionary) -> void:
 	_skicka(id, l)
 
 
+## En figur är upptagen om någon annan vid bordet har den. När alla figurer är tagna (fler spelare än
+## figurer) får man välja en som redan används.
 func _figur_upptagen(b: Dictionary, f: int, utom: int) -> bool:
+	var tagna := {}
 	for q in b.platser.size():
-		if q != utom and b.platser[q].typ != "tom" and b.platser[q].figur == f:
-			return true
-	return false
+		if q != utom and b.platser[q].typ != "tom" and b.platser[q].figur >= 0:
+			tagna[b.platser[q].figur] = true
+	return tagna.has(f) and tagna.size() < Figurer.antal()
 
 
 func _figur(d: Dictionary) -> int:

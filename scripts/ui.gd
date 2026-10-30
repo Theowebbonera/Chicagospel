@@ -1566,6 +1566,9 @@ func visa_bordinfo(d: Dictionary) -> void:
 			ga_tagna[int(x.figur)] = true
 		if x.typ != "tom":
 			namnen.append(str(x.namn))
+	# alla figurer tagna: man får ta en som redan används (som servern)
+	if ga_tagna.size() >= Figurer.antal():
+		ga_tagna = {}
 	var r := Regler.new()
 	r.fran_dict(d.regler)
 	var t := "Värd: %s\n%s\n" % [d.varde_namn, r.kort_sammanfattning()]
