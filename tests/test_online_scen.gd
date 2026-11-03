@@ -135,6 +135,11 @@ func _init() -> void:
 		if main.vantar_pa_drag and main.inmatning != "":
 			match main.inmatning:
 				"byte":
+					# byt flera kort ibland: då hämtas flera egna nya kort på en gång (fel som gav kort åt motståndaren)
+					var eg: Array = main.vhand[main.min_plats]
+					main.valda = []
+					for i in mini(randi_range(0, 3), mini(main.max_val, eg.size())):
+						main.valda.append(eg[i])
 					main.beslut.emit("byt")
 				"upp":
 					main.beslut.emit(randf() < 0.5)
@@ -143,6 +148,15 @@ func _init() -> void:
 				"spela":
 					if not main.tillatna.is_empty():
 						main.beslut.emit(main.tillatna[0])
+		# varje kort i högst en hand
+		var sedda := {}
+		for q in main.vhand.size():
+			for c in main.vhand[q]:
+				if sedda.has(c):
+					brott += 1
+					if brott < 6:
+						print("FEL: kort %d finns i både plats %d och %d" % [c, sedda[c], q])
+				sedda[c] = q
 		# dolda kort: bara stickkort och egen hand får synas
 		var kam: Vector3 = main.kam.global_position
 		for c in 52:

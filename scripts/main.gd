@@ -1930,8 +1930,11 @@ func _tolka_online(e: Dictionary) -> void:
 					ny.append(lek_vis[lek_vis.size() - 1 - i])
 				e.nya = ny
 			else:
+				# redan hämtade nya kort får inte väljas som anonym nod åt nästa (då hamnar de i en annan hand)
+				var hamtade: Array = []
 				for c in e.nya:
-					_hamta_till(c, lek_vis)
+					_hamta_till(c, lek_vis, hamtade)
+					hamtade.append(c)
 		"upp":
 			# det uppvända kortet hämtas till talongen först, sedan väljs en anonym nod som det slängda kortet
 			_hamta_till(e.kort, lek_vis)
@@ -1948,14 +1951,14 @@ func _tolka_online(e: Dictionary) -> void:
 				_hamta_till(e.kort, vhand[e.spelare])
 
 
-func _hamta_till(c: int, lista: Array) -> void:
+func _hamta_till(c: int, lista: Array, skydd: Array = []) -> void:
 	if c in lista:
 		return
 	var egen: Array = vhand[min_plats] if min_plats < vhand.size() else []
 	var x := -1
 	for i in range(lista.size() - 1, -1, -1):
 		var y: int = lista[i]
-		if not y in egen and not y in stick_vis:
+		if not y in egen and not y in stick_vis and not y in skydd and y != upp_vis:
 			x = y
 			break
 	if x < 0:
