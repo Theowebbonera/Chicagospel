@@ -1,13 +1,18 @@
 extends RefCounted
 ## Figurerna som kan sitta vid bordet: realistiska människor från Blender (assets/gubbar/, blender/gubbar.py),
-## som gubbe.gd styr via skelettet.
+## som gubbe.gd styr via skelettet. "sexsju" = vad figuren säger när den gör 6-7-rörelsen (standard "6-7").
 
 const FIGURER := [
 	# Blender + MPFB efter Theos bild från fjälltoppen.
-	{"namn": "Kevin", "modell": "res://assets/gubbar/kevin.glb"},
+	{"namn": "Kevin", "modell": "res://assets/gubbar/kevin.glb", "sexsju": "6-kugen"},
 	{"namn": "Theo", "modell": "res://assets/gubbar/theo.glb"},
 	{"namn": "Lukas", "modell": "res://assets/gubbar/lukas.glb"},
 	{"namn": "Adam", "modell": "res://assets/gubbar/adam.glb"},
+	# kändisar för skojs skull (frisyr, kläder och tröjnummer; ansiktena är inte porträtt)
+	{"namn": "Ronaldo", "modell": "res://assets/gubbar/ronaldo.glb"},
+	{"namn": "Messi", "modell": "res://assets/gubbar/messi.glb"},
+	{"namn": "Trump", "modell": "res://assets/gubbar/trump.glb"},
+	{"namn": "Zlatan", "modell": "res://assets/gubbar/zlatan.glb"},
 ]
 
 
@@ -17,6 +22,11 @@ static func antal() -> int:
 
 static func namn(i: int) -> String:
 	return FIGURER[posmod(i, FIGURER.size())].namn
+
+
+## Vad figuren säger vid 6-7 (Kevin säger "6-kugen", samma rörelse).
+static func sexsju_text(i: int) -> String:
+	return FIGURER[posmod(i, FIGURER.size())].get("sexsju", "6-7")
 
 
 ## Fyller i figurer för platser som saknar (-1) med slumpade figurer som inte redan är valda.

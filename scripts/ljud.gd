@@ -19,6 +19,7 @@ func _ready() -> void:
 	ljud["splatt"] = _splatt()
 	ljud["small"] = _small()
 	ljud["puff"] = _puff()
+	ljud["spruta"] = _spruta()
 	ljud["kyss"] = _kyss()
 	ljud["sexsju"] = _sexsju()
 	ljud["blanda"] = _riffle(0.85)
@@ -208,6 +209,24 @@ func _small() -> AudioStreamWAV:
 		var t := float(i) / rate
 		var x := rng.randf_range(-1.0, 1.0)
 		s[i] = x * exp(-t * 40.0) * 0.9 + x * 0.12 * exp(-t * 4.0) * (0.5 + 0.5 * sin(TAU * 31.0 * t))
+	return _wav(s, rate)
+
+
+## Vattenpistol: väsande sprut i pulser, som när man pumpar avtryckaren.
+func _spruta() -> AudioStreamWAV:
+	var rate := 44100
+	var n := int(rate * 0.95)
+	var s := PackedFloat32Array()
+	s.resize(n)
+	var lp := 0.0
+	for i in n:
+		var t := float(i) / rate
+		var x := rng.randf_range(-1.0, 1.0)
+		lp += 0.45 * (x - lp)
+		var vas := x - lp  # ljust väs
+		var puls := 0.55 + 0.45 * sin(TAU * 11.0 * t)
+		var env := minf(1.0, t * 40.0) * minf(1.0, (0.95 - t) * 8.0)
+		s[i] = vas * puls * env * 0.5
 	return _wav(s, rate)
 
 

@@ -17,7 +17,8 @@ func _ok(v: bool, t: String) -> void:
 
 func _init() -> void:
 	await process_frame
-	_ok(Figurer.antal() == 4, "fyra figurer (%d)" % Figurer.antal())
+	_ok(Figurer.antal() == 8, "åtta figurer (%d)" % Figurer.antal())
+	_ok(Figurer.sexsju_text(0) == "6-kugen" and Figurer.sexsju_text(1) == "6-7", "Kevin säger 6-kugen, de andra 6-7")
 	for i in Figurer.antal():
 		var d: Dictionary = Figurer.FIGURER[i]
 		var g := Gubbe.new()
@@ -28,7 +29,7 @@ func _init() -> void:
 		_ok(g.skelett != null and g.huvud != null and g.tomatfleck != null and g.bubbla != null and g.ben.size() == 9 and not g.ben.values().has(-1), "%s har skelett och alla delar" % d.namn)
 		g.titta_pa(Vector3(0, 2, -5))
 		g.gest()
-		for typ in ["vattenballong", "tomat", "tarta", "snoboll", "flygplan", "ros", "hjarta", "krona", "konfetti"]:
+		for typ in ["vattenballong", "vattenpistol", "tomat", "agg", "tarta", "snoboll", "kudde", "flygplan", "ros", "hjarta", "krona", "pokal", "konfetti"]:
 			g.traffad(typ)
 		g.jubel(true)
 		g.sexsju()
@@ -46,11 +47,11 @@ func _init() -> void:
 	for x in f:
 		unika[x] = true
 	_ok(unika.size() == 4 and f[0] == 2, "slumpade figurer är unika och valda behålls: %s" % [f])
-	# fler spelare än figurer: alla figurer används, de sista får dubbletter
+	# sex spelare och åtta figurer: alla får olika figurer
 	f = Figurer.fordela([2, -1, -1, -1, -1, -1], rng)
 	unika = {}
 	for x in f:
 		unika[x] = true
-	_ok(unika.size() == 4 and f[0] == 2 and not f.has(-1), "sex spelare får alla fyra figurerna: %s" % [f])
+	_ok(unika.size() == 6 and f[0] == 2 and not f.has(-1), "sex spelare får sex olika figurer: %s" % [f])
 	print("%d figurer provade, fel: %d" % [Figurer.antal(), fel])
 	quit(1 if fel else 0)

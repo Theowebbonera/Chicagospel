@@ -1,7 +1,7 @@
 extends Node3D
 ## En figur som sitter vid bordet: en realistisk människa från Blender (figurer.gd, assets/gubbar/).
 ## Andas, tittar mot den som har turen, gör en gest när den spelar ett kort, jublar vid poäng,
-## gör 6-7 och reagerar på kast (blöt, tomat, tårta, snöboll, flygplan, hjärta, krona, konfetti).
+## gör 6-7 och reagerar på kast (blöt, tomat, ägg, tårta, snöboll, kudde, flygplan, hjärta, krona, pokal, konfetti).
 ## Lokal -Z pekar mot bordets mitt.
 
 const Figurer := preload("res://scripts/figurer.gd")
@@ -42,9 +42,11 @@ var modell: Node3D
 var ben := {}
 var vila := {}
 var nick := 0.0
+var index_figur := 0
 
 
 func bygg_figur(index: int) -> void:
+	index_figur = index
 	def = Figurer.FIGURER[posmod(index, Figurer.FIGURER.size())]
 	fas = index * 1.7
 	var scen: PackedScene = load(def.modell)
@@ -104,7 +106,7 @@ func _gradde_och_krona() -> void:
 		_del(_klot(0.05), _mat([Color(0.9, 0.1, 0.15), Color(0.15, 0.4, 0.95), Color(0.1, 0.7, 0.3)][k % 3], 0.2), Vector3(cos(a) * 0.36, 0.34, sin(a) * 0.36), krona)
 	krona.visible = false
 	bubbla = Label3D.new()
-	bubbla.text = "6-7"
+	bubbla.text = Figurer.sexsju_text(index_figur)
 	bubbla.font_size = 170
 	bubbla.pixel_size = 0.01
 	bubbla.outline_size = 30
@@ -205,16 +207,23 @@ func sexsju() -> void:
 	bubbla.visible = true
 
 
-## typ: vattenballong, tomat, tarta, snoboll, flygplan, ros, hjarta, krona, konfetti
+## typ: vattenballong, vattenpistol, tomat, agg, tarta, snoboll, kudde, flygplan, ros, hjarta, krona, pokal, konfetti
 func traffad(typ: String) -> void:
 	match typ:
 		"vattenballong":
 			blot = 1.0
 			skak = 1.0
-		"tomat":
+		"vattenpistol":
+			blot = 0.8
+			skak = 0.6
+		"tomat", "agg":
 			tomat_t = 5.0
 			tomatfleck.visible = true
+			# samma fläck i ansiktet: röd tomat eller gul äggula
+			(tomatfleck.material_override as StandardMaterial3D).albedo_color = Color(0.85, 0.1, 0.06) if typ == "tomat" else Color(0.98, 0.78, 0.15)
 			skak = 0.7
+		"kudde":
+			skak = 0.9
 		"tarta":
 			gradde_t = 5.0
 			gradde.visible = true
@@ -232,6 +241,9 @@ func traffad(typ: String) -> void:
 			krona.visible = true
 			glad = 1.0
 			hopp = 0.5
+		"pokal":
+			glad = 1.0
+			hopp = 1.0
 		"konfetti":
 			glad = 1.0
 			hopp = 1.0

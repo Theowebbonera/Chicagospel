@@ -74,6 +74,52 @@ PERSONER = [
         "armarm": "l",
         "ansikte": {"head/head-triangular": 0.3, "head/head-scale-horiz-decr": 0.15, "chin/chin-prominent-incr": 0.4, "chin/chin-bones-incr": 0.3, "mouth/mouth-angles-up": 0.5},
     },
+    # Kändisar för skojs skull: igenkännbara på frisyr, kläder och nummer (ansiktena är MPFB med formmål,
+    # inte porträtt). Inga klubb- eller förbundsmärken.
+    {
+        "namn": "Ronaldo",
+        "macro": {"age": 0.62, "muscle": 0.92, "weight": 0.42, "height": 0.78, "proportions": 0.9},
+        "hud": "young_caucasian_male2", "hudton": (0.9, 0.76, 0.62),
+        "har": "short02", "harfarg": (0.06, 0.045, 0.035),
+        "klader": "male_casualsuit06", "troja": (0.72, 0.06, 0.12), "byxor": (0.05, 0.3, 0.16),
+        "text": "7", "textstorlek": 0.11, "textfarg": (0.96, 0.84, 0.45),
+        "ansikte": {"head/head-oval": 0.45, "chin/chin-prominent-incr": 0.45, "chin/chin-width-incr": 0.2,
+                    "cheek/l-cheek-bones-incr": 0.35, "cheek/r-cheek-bones-incr": 0.35, "eyebrows/eyebrows-angle-up": 0.3,
+                    "nose/nose-scale-horiz-decr": 0.2, "mouth/mouth-angles-up": 0.7, "mouth/mouth-scale-horiz-incr": 0.25},
+    },
+    {
+        "namn": "Messi",
+        "macro": {"age": 0.6, "muscle": 0.6, "weight": 0.5, "height": 0.28, "proportions": 0.75},
+        "hud": "young_caucasian_male2", "hudton": (0.96, 0.84, 0.72),
+        "har": "short03", "harfarg": (0.2, 0.13, 0.075),
+        "klader": "male_casualsuit06", "troja": (0.47, 0.71, 0.9), "byxor": (0.08, 0.08, 0.09),
+        "ranor": {"farg": (0.95, 0.95, 0.94), "bredd": 0.075},
+        "text": "10", "textstorlek": 0.1, "textfarg": (0.08, 0.1, 0.18),
+        "skagg": {"farg": (0.19, 0.12, 0.07), "styrka": 0.97}, "klipp_lugg": 0.012,
+        "ansikte": {"head/head-round": 0.3, "chin/chin-height-incr": 0.2, "nose/nose-scale-vert-incr": 0.2, "nose/nose-point-down": 0.2,
+                    "eyebrows/eyebrows-angle-down": 0.25, "mouth/mouth-angles-up": 0.35},
+    },
+    {
+        "namn": "Trump",
+        "macro": {"age": 0.88, "muscle": 0.35, "weight": 0.85, "height": 0.78, "proportions": 0.7},
+        "hud": "old_caucasian_male", "hudton": (1.1, 0.83, 0.6),
+        "har": "short03", "harfarg": (0.93, 0.78, 0.47),
+        "klipp_lugg": 0.02, "klader": "male_elegantsuit01", "troja": (0.09, 0.11, 0.2), "slips": (0.78, 0.07, 0.09),
+        "ansikte": {"head/head-square": 0.4, "head/head-fat-incr": 0.5, "chin/chin-width-incr": 0.4, "neck/neck-double-incr": 0.6,
+                    "cheek/l-cheek-volume-incr": 0.4, "cheek/r-cheek-volume-incr": 0.4, "mouth/mouth-scale-horiz-decr": 0.3,
+                    "mouth/mouth-lowerlip-volume-incr": 0.3, "mouth/mouth-angles-down": 0.25, "eyebrows/eyebrows-angle-down": 0.3},
+    },
+    {
+        "namn": "Zlatan",
+        "macro": {"age": 0.7, "muscle": 0.85, "weight": 0.5, "height": 0.97, "proportions": 0.85},
+        "hud": "young_caucasian_male2", "hudton": (0.92, 0.8, 0.68),
+        "har": "ponytail01", "harfarg": (0.07, 0.05, 0.04),
+        "klader": "male_casualsuit06", "troja": (0.99, 0.82, 0.08), "byxor": (0.04, 0.2, 0.52),
+        "text": "10", "textstorlek": 0.1, "textfarg": (0.04, 0.22, 0.55),
+        "skagg": {"farg": (0.1, 0.07, 0.05), "styrka": 0.93},
+        "ansikte": {"head/head-rectangular": 0.4, "head/head-scale-vert-incr": 0.2, "nose/nose-scale-vert-incr": 0.5, "nose/nose-hump-incr": 0.6,
+                    "nose/nose-scale-depth-incr": 0.3, "chin/chin-prominent-incr": 0.35, "chin/chin-height-incr": 0.25, "mouth/mouth-angles-up": 0.3},
+    },
 ]
 
 
@@ -130,6 +176,166 @@ def farga_klader(img, kladnamn, troja, byxor):
         for k in range(3):
             a[..., k] = np.where(m, farg[k] * skugga, a[..., k])
     _spara(img, a)
+
+
+def farga_kostym(img, kostym, slips):
+    """Kostymen (elegantsuit01): kavaj och byxor i kostymfärgen, skjortan vit, slipsen i slipsfärgen."""
+    a = _pixlar(img)
+    h, w = a.shape[:2]
+    v = (np.arange(h, dtype=np.float32) + 0.5)[:, None] / h
+    u = (np.arange(w, dtype=np.float32) + 0.5)[None, :] / w
+    lum = a[..., 0] * 0.3 + a[..., 1] * 0.59 + a[..., 2] * 0.11
+    sat = a[..., :3].max(-1) - a[..., :3].min(-1)
+    slipsruta = (u > 0.355) & (u < 0.47) & (v > 0.8) & (v < 0.95)
+    slips_m = slipsruta & (sat > 0.05)
+    skjorta = (lum > 0.55) & ~slips_m
+    kostym_m = ~slips_m & ~skjorta & (a[..., 3] > 0.01)
+    medel = float(np.median(lum[kostym_m]))
+    skugga = np.clip(1.0 + (lum / max(medel, 1e-3) - 1.0) * 0.55, 0.5, 1.25)
+    for k in range(3):
+        a[..., k] = np.where(kostym_m, kostym[k] * skugga, a[..., k])
+        a[..., k] = np.where(slips_m, slips[k] * np.clip(0.75 + lum * 0.6, 0.7, 1.15), a[..., k])
+        a[..., k] = np.where(skjorta, np.clip(lum * 1.05 + 0.04, 0, 0.97), a[..., k])
+    _spara(img, a)
+
+
+def _formlage(obj):
+    """Vertexlägena i världen med alla formmål (utan modifierare), och trianglarnas vertexar och UV."""
+    mods = [(m, m.show_viewport) for m in obj.modifiers]
+    for m, _ in mods:
+        m.show_viewport = False
+    bpy.context.view_layer.update()
+    ev = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    me = ev.to_mesh()
+    co = np.empty(len(me.vertices) * 3, dtype=np.float32)
+    me.vertices.foreach_get("co", co)
+    me.calc_loop_triangles()
+    nt = len(me.loop_triangles)
+    tl = np.empty(nt * 3, dtype=np.int32)
+    tv = np.empty(nt * 3, dtype=np.int32)
+    me.loop_triangles.foreach_get("loops", tl)
+    me.loop_triangles.foreach_get("vertices", tv)
+    uv = np.empty(len(me.loops) * 2, dtype=np.float32)
+    me.uv_layers.active.data.foreach_get("uv", uv)
+    ev.to_mesh_clear()
+    for m, vis in mods:
+        m.show_viewport = vis
+    mw = np.array(obj.matrix_world, dtype=np.float32)
+    co = co.reshape(-1, 3) @ mw[:3, :3].T + mw[:3, 3]
+    return co, tv.reshape(-1, 3), uv.reshape(-1, 2)[tl.reshape(-1, 3)]
+
+
+def mala(img, tv, tuv, varden, fn, hoppa, buffert=None):
+    """Målar i en textur efter ett värde per vertex: varje triangel rastreras i UV-rymden och värdena
+    interpoleras per pixel; fn(värden, rgb) ger nya färger. hoppa(värden för triangelns hörn) hoppar över."""
+    a = _pixlar(img) if buffert is None else buffert
+    h, w = a.shape[:2]
+    skala = np.array([w, h], dtype=np.float32)
+    for t in range(len(tv)):
+        vv = varden[tv[t]]
+        if hoppa(vv, tuv[t]):
+            continue
+        p = tuv[t] * skala - 0.5
+        x0, y0 = np.floor(p.min(0)).astype(int) - 1
+        x1, y1 = np.ceil(p.max(0)).astype(int) + 1
+        x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, w - 1), min(y1, h - 1)
+        if x1 < x0 or y1 < y0:
+            continue
+        d = (p[1, 1] - p[2, 1]) * (p[0, 0] - p[2, 0]) + (p[2, 0] - p[1, 0]) * (p[0, 1] - p[2, 1])
+        if abs(d) < 1e-9:
+            continue
+        X, Y = np.meshgrid(np.arange(x0, x1 + 1), np.arange(y0, y1 + 1))
+        b0 = ((p[1, 1] - p[2, 1]) * (X - p[2, 0]) + (p[2, 0] - p[1, 0]) * (Y - p[2, 1])) / d
+        b1 = ((p[2, 1] - p[0, 1]) * (X - p[2, 0]) + (p[0, 0] - p[2, 0]) * (Y - p[2, 1])) / d
+        b2 = 1 - b0 - b1
+        inne = (b0 > -0.08) & (b1 > -0.08) & (b2 > -0.08)  # lite utanför, så att sömmarna inte syns
+        if not inne.any():
+            continue
+        val = b0[..., None] * vv[0] + b1[..., None] * vv[1] + b2[..., None] * vv[2]
+        ys, xs = Y[inne], X[inne]
+        if buffert is None:
+            a[ys, xs, :3] = fn(val[inne], a[ys, xs, :3])
+        else:
+            a[ys, xs] = np.maximum(a[ys, xs], val[inne][:, 0])
+    if buffert is None:
+        _spara(img, a)
+
+
+JEANS = {"male_casualsuit02": (0.76, 0.58), "male_casualsuit05": (0.61, 0.46), "male_casualsuit06": (0.79, 0.58)}
+
+
+def ranor(obj, img, kladnamn, cfg):
+    """Lodräta ränder på tröjan (Argentina): efter världens X, så att ränderna går rakt över bröstet."""
+    co, tv, tuv = _formlage(obj)
+    ju, jv = JEANS[kladnamn]
+    farg = np.array(cfg["farg"], dtype=np.float32)
+    bredd = cfg["bredd"]
+    a = _pixlar(img)
+    h, w = a.shape[:2]
+    v = (np.arange(h) + 0.5)[:, None] / h
+    u = (np.arange(w) + 0.5)[None, :] / w
+    troja = ~((u < ju) & (v < jv)) & (a[..., 3] > 0.01)
+    lum = a[..., 0] * 0.3 + a[..., 1] * 0.59 + a[..., 2] * 0.11
+    medel = float(np.median(lum[troja]))
+
+    def fn(val, rgb):
+        vit = (np.floor(val[:, 0] / bredd + 0.5).astype(int) % 2) == 0
+        l = rgb[:, 0] * 0.3 + rgb[:, 1] * 0.59 + rgb[:, 2] * 0.11
+        sk = np.clip(l / max(medel, 1e-3), 0.6, 1.2)[:, None]
+        return np.where(vit[:, None], np.clip(farg[None, :] * sk, 0, 1), rgb)
+
+    mala(img, tv, tuv, co[:, :1], fn, lambda vv, uv: bool(((uv[:, 0] < ju) & (uv[:, 1] < jv)).any()))
+
+
+def skagg(kropp, img, cfg):
+    """Helskägg målat på huden: kinder, haka och mustasch, men inte läpparna. Gränserna mäts från läpparna."""
+    co, tv, tuv = _formlage(kropp)
+    nv = len(co)
+
+    def vikt(grupp):
+        out = np.zeros(nv, dtype=np.float32)
+        if grupp not in kropp.vertex_groups:
+            return out
+        gi = kropp.vertex_groups[grupp].index
+        for v in kropp.data.vertices:
+            for g in v.groups:
+                if g.group == gi:
+                    out[v.index] = g.weight
+        return out
+
+    lapp = vikt("lips") > 0.3
+    huvud = (vikt("head") > 0.3) | (vikt("neck_01") > 0.3)
+    hjalp = (vikt("HelperGeometry") > 0) | (vikt("JointCubes") > 0)
+    L = co[lapp]
+    mitt = L.mean(0)
+    lw = (L[:, 0].max() - L[:, 0].min()) / 2
+    lt = L[:, 2].max() - mitt[2]
+    dx = np.abs(co[:, 0] - mitt[0])
+    dz = co[:, 2] - mitt[2]
+    dy = co[:, 1] - mitt[1]
+
+    def ss(e0, e1, x):
+        t = np.clip((x - e0) / (e1 - e0), 0, 1)
+        return t * t * (3 - 2 * t)
+
+    # övre gränsen: mustaschen strax över läppen, stiger ut mot kinderna (kindskägg mot örat)
+    zmax = np.minimum(lt + 0.014 + np.clip(dx - lw * 0.9, 0, None) * 0.55, lt + 0.034)
+    alfa = ss(-0.004, 0.012, zmax - dz) * ss(-0.09, -0.065, dz) * ss(0.075, 0.045, dy)
+    alfa = np.where(huvud & ~lapp & ~hjalp, alfa, 0.0)
+    # läpparna och en smal kant runt dem fria
+    nara = np.min(np.linalg.norm(co[:, None, :] - L[None, ::2, :], axis=2), axis=1)
+    alfa = alfa * ss(0.001, 0.005, nara) * cfg["styrka"]
+    farg = np.array(cfg["farg"], dtype=np.float32)
+    # alfa målas först i en egen buffert (största värdet där trianglar överlappar), sedan blandas skägget in en gång
+    px = _pixlar(img)
+    buf = np.zeros(px.shape[:2], dtype=np.float32)
+    mala(img, tv, tuv, alfa[:, None].astype(np.float32), None, lambda vv, uv: bool((vv[:, 0] <= 0.001).all()), buf)
+    rng = np.random.default_rng(7)
+    # hårstrån: brus i färgen, och huden skiner igenom lite
+    brus = rng.uniform(0.55, 1.5, size=buf.shape + (1,)).astype(np.float32)
+    a = (np.clip(buf, 0, 1) * rng.uniform(0.75, 1.0, size=buf.shape).astype(np.float32))[..., None]
+    px[..., :3] = px[..., :3] * (1 - a) + np.clip(farg * brus, 0, 1) * a
+    _spara(img, px)
 
 
 def material_bilder(obj):
@@ -501,11 +707,11 @@ def glasogon(rig, ogon, huvud_lo, huvud_hi, namn):
     return delar
 
 
-def brosttext(rig, klader, rygg, text, namn):
-    """Vit text på bröstet (DevEd), strax framför tröjans yta och följer bröstkorgen."""
+def brosttext(rig, klader, rygg, text, namn, storlek=0.06, farg=(0.95, 0.95, 0.96)):
+    """Text på bröstet (DevEd, tröjnummer), strax framför tröjans yta och följer bröstkorgen."""
     z = (rig.matrix_world @ rig.pose.bones["neck_01"].head).z - 0.15
     fram = min((klader.matrix_world @ v.co).y for v in klader.data.vertices if abs((klader.matrix_world @ v.co).x) < 0.04 and abs((klader.matrix_world @ v.co).z - z) < 0.02)
-    o = textobjekt(text, 0.06, material(f"{namn}_text", (0.95, 0.95, 0.96), 0.6), f"{namn}_brosttext")
+    o = textobjekt(text, storlek, material(f"{namn}_text", farg, 0.6), f"{namn}_brosttext")
     o.data.transform(Matrix.Rotation(math.radians(90) - math.radians(8), 4, "X"))
     o.location = (0.0, fram - 0.011, z)
     till_ben(o, rig, "spine_03")
@@ -568,6 +774,8 @@ def bygg(p):
     # texturer: egna kopior, toning och omfärgning
     for img in egna_bilder(kropp, f"{namn}_", TEX["hud"]):
         tona(img, p["hudton"])
+        if p.get("skagg"):
+            skagg(kropp, img, p["skagg"])
     for typ in ("Hair", "Eyebrows"):
         if typ in tillagg:
             for img in egna_bilder(tillagg[typ], f"{namn}_", TEX["har"]):
@@ -581,7 +789,12 @@ def bygg(p):
             for img in egna_bilder(tillagg[typ], f"{namn}_", TEX["ovrigt"]):
                 img.pack()
     for img in egna_bilder(klader, f"{namn}_", TEX["klader"]):
-        farga_klader(img, p["klader"], p["troja"], p["byxor"])
+        if p["klader"] == "male_elegantsuit01":
+            farga_kostym(img, p["troja"], p["slips"])
+        else:
+            farga_klader(img, p["klader"], p["troja"], p["byxor"])
+            if p.get("ranor"):
+                ranor(klader, img, p["klader"], p["ranor"])
     for img in egna_bilder(skor, f"{namn}_", TEX["ovrigt"]):
         img.pack()
     # kläderna en aning ut från huden, så att axlarna inte sticker igenom i sittande pose
@@ -599,7 +812,7 @@ def bygg(p):
     bryn_z = obj_bbox(bryn)[1].z if bryn else huvud_lo.z + (huvud_hi.z - huvud_lo.z) * 0.62
     # kepsen mäts över ögonbrynen, där den sitter (inte över öronen)
     huvud_lo, huvud_hi = grupp_bbox(kropp, "head", z_min=bryn_z + 0.02)
-    if har:
+    if har and p.get("keps"):
         # kepsen trycker ned håret: det som skulle sticka upp genom kupan tas bort, och bredden tas
         # från håret precis under kepsens kant (där håret syns)
         hlo, hhi = obj_bbox(har)
@@ -612,11 +825,21 @@ def bygg(p):
         bmesh.ops.delete(bm, geom=bort, context="VERTS")
         bm.to_mesh(har.data)
         bm.free()
-    keps(rig, huvud_lo, huvud_hi, bryn_z, p["keps"], namn)
+    if har and p.get("klipp_lugg"):
+        # luggen ska inte hänga ned över ögonen
+        bm = bmesh.new()
+        bm.from_mesh(har.data)
+        fram_y = huvud_lo.y + 0.05
+        bort = [v for v in bm.verts if (har.matrix_world @ v.co).z < bryn_z + p["klipp_lugg"] and (har.matrix_world @ v.co).y < fram_y]
+        bmesh.ops.delete(bm, geom=bort, context="VERTS")
+        bm.to_mesh(har.data)
+        bm.free()
+    if p.get("keps"):
+        keps(rig, huvud_lo, huvud_hi, bryn_z, p["keps"], namn)
     if p.get("glasogon") and "Eyes" in tillagg:
         glasogon(rig, tillagg["Eyes"], huvud_lo, huvud_hi, namn)
     if p.get("text"):
-        brosttext(rig, klader, None, p["text"], namn)
+        brosttext(rig, klader, None, p["text"], namn, p.get("textstorlek", 0.06), p.get("textfarg", (0.95, 0.95, 0.96)))
     if p.get("handske"):
         s = p["handske"]
         grupper = [f"hand_{s}"] + [f"{f}_{i:02d}_{s}" for f in ("index", "middle", "ring", "pinky", "thumb") for i in (1, 2, 3)]

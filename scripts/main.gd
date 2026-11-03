@@ -495,7 +495,7 @@ func _unhandled_input(e: InputEvent) -> void:
 		if hover_id >= 0:
 			_klicka(hover_id)
 		elif hover_gubbe >= 0:
-			ui.visa_kastmeny(e.position, hover_gubbe, spelare[hover_gubbe].namn)
+			ui.visa_kastmeny(e.position, hover_gubbe, spelare[hover_gubbe].namn, Figurer.sexsju_text(int(spelare[hover_gubbe].get("figur", 0))))
 	elif e is InputEventKey and e.pressed and not e.echo:
 		if e.keycode == KEY_ESCAPE:
 			ui.visa_paus(not ui.ar_pausad)
@@ -622,6 +622,7 @@ func _satt_upp_bord() -> void:
 		g.titta_pa(Vector3.ZERO)
 		gubbar.append(g)
 	ui.visa_hud(spelare, regler.malpoang)
+	ui.satt_sexsju_text(Figurer.sexsju_text(int(spelare[betraktare].get("figur", 0))) if betraktare < spelare.size() else "6-7")
 	_tavla()
 
 
@@ -891,6 +892,9 @@ func _kasta(fran: int, till: int, typ: String, svar: bool) -> void:
 	if typ == "sexsju":
 		_sexsju(till)
 		return
+	if typ == "vattenpistol":
+		_vattenpistol(fran, till, svar)
+		return
 	if typ == "konfetti":
 		# tårtsmällare: smäller direkt över figuren
 		ljud.spela("small", 1.0, -2.0, 0.08)
@@ -912,9 +916,12 @@ func _kasta(fran: int, till: int, typ: String, svar: bool) -> void:
 		"flygplan":
 			tid = 1.5
 			bage = 0.9
-		"hjarta", "krona":
+		"hjarta", "krona", "pokal":
 			tid = 1.2
 			bage = 1.6
+		"kudde":
+			tid = 1.0
+			bage = 1.8
 	var tw := proj.create_tween()
 	tw.tween_method(func(t: float) -> void:
 		var mal := _kast_mal(till)
@@ -926,7 +933,7 @@ func _kasta(fran: int, till: int, typ: String, svar: bool) -> void:
 				proj.look_at_from_position(p, p + fram + Vector3.UP * cos(PI * t) * 0.6, Vector3.UP)
 			proj.rotate_object_local(Vector3.FORWARD, sin(t * 9.0) * 0.25)
 			proj.position = p
-		elif typ == "hjarta" or typ == "krona":
+		elif typ == "hjarta" or typ == "krona" or typ == "pokal":
 			proj.position = p
 			proj.rotation = Vector3(0, t * TAU, 0)
 		else:
@@ -945,6 +952,91 @@ func _kasta(fran: int, till: int, typ: String, svar: bool) -> void:
 			proj.queue_free()
 		if k == korning:
 			_traff(fran, till, typ, pos, svar))
+
+
+## Vattenpistol: en leksakspistol dyker upp hos den som skjuter och sprutar en stråle droppar mot målet.
+func _vattenpistol(fran: int, till: int, svar: bool) -> void:
+	var k := korning
+	var pistol := _pistol()
+	add_child(pistol)
+	pistol.position = _kast_start(fran)
+	pistol.scale = Vector3.ONE * 0.01
+	var mal0 := _kast_mal(till)
+	if pistol.position.distance_to(mal0) > 0.01:
+		pistol.look_at(mal0, Vector3.UP)
+	var in_tw := pistol.create_tween()
+	in_tw.tween_property(pistol, "scale", Vector3.ONE, 0.15 * tf).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if fran >= 0:
+		_gest(fran)
+	await get_tree().create_timer(0.18 * tf, false).timeout
+	ljud.spela("spruta", 1.0, -2.0, 0.05)
+	var vatten := _enkel_mat(Color(0.45, 0.72, 1.0, 0.75), 0.05)
+	vatten.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	vatten.metallic_specular = 0.9
+	for i in 16:
+		if k != korning or not is_instance_valid(pistol):
+			break
+		var mal := _kast_mal(till)
+		if pistol.global_position.distance_to(mal) > 0.01:
+			pistol.look_at(mal, Vector3.UP)
+		var mynning := pistol.global_position + pistol.global_basis * Vector3(0, 0.06, -0.5)
+		var d := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.05
+		sm.height = 0.13
+		d.mesh = sm
+		d.material_override = vatten
+		add_child(d)
+		d.position = mynning
+		var slump := Vector3(rng.randf_range(-0.12, 0.12), rng.randf_range(-0.1, 0.1), rng.randf_range(-0.12, 0.12))
+		var dt := d.create_tween()
+		dt.tween_method(func(t: float) -> void:
+			var m := _kast_mal(till) + slump
+			d.position = mynning.lerp(m, t) + Vector3.UP * 0.35 * sin(PI * t), 0.0, 1.0, 0.32 * tf)
+		dt.tween_callback(d.queue_free)
+		await get_tree().create_timer(0.05 * tf, false).timeout
+	await get_tree().create_timer(0.3 * tf, false).timeout
+	if is_instance_valid(pistol):
+		var ut := pistol.create_tween()
+		ut.tween_property(pistol, "scale", Vector3.ONE * 0.01, 0.2 * tf)
+		ut.tween_callback(pistol.queue_free)
+	if k == korning:
+		_traff(fran, till, "vattenpistol", _kast_mal(till), svar)
+
+
+## Leksaksvattenpistol i neonfärger, pipan mot -Z.
+func _pistol() -> Node3D:
+	var n3 := Node3D.new()
+	var kropp := _enkel_mat(Color(0.2, 0.85, 0.3), 0.35)
+	var detalj := _enkel_mat(Color(1.0, 0.5, 0.1), 0.35)
+	var tank := _enkel_mat(Color(0.35, 0.65, 1.0, 0.7), 0.08)
+	tank.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var b := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.14, 0.16, 0.55)
+	b.mesh = bm
+	b.material_override = kropp
+	n3.add_child(b)
+	var g := MeshInstance3D.new()
+	var gm := BoxMesh.new()
+	gm.size = Vector3(0.11, 0.3, 0.14)
+	g.mesh = gm
+	g.material_override = detalj
+	g.position = Vector3(0, -0.18, 0.16)
+	g.rotation.x = -0.3
+	n3.add_child(g)
+	var p := MeshInstance3D.new()
+	var pm := CylinderMesh.new()
+	pm.top_radius = 0.035
+	pm.bottom_radius = 0.045
+	pm.height = 0.2
+	p.mesh = pm
+	p.material_override = detalj
+	p.rotation.x = -PI / 2
+	p.position = Vector3(0, 0.02, -0.36)
+	n3.add_child(p)
+	_klot_i(n3, 0.11, tank, Vector3(0, 0.16, 0.05), Vector3(1, 0.8, 1.3))
+	return n3
 
 
 ## 6-7: figuren gör rörelsen. Den egna platsen (utan figur framför kameran) visas i 2D.
@@ -966,7 +1058,7 @@ func _sexsju(p: int) -> void:
 	if p >= 0 and p < gubbar.size() and p != betraktare:
 		gubbar[p].sexsju()
 	else:
-		ui.sexsju_skarm()
+		ui.sexsju_skarm(Figurer.sexsju_text(int(spelare[p].get("figur", 0))) if p >= 0 and p < spelare.size() else "6-7")
 
 
 func _traff(fran: int, till: int, typ: String, pos: Vector3, svar: bool) -> void:
@@ -974,6 +1066,17 @@ func _traff(fran: int, till: int, typ: String, pos: Vector3, svar: bool) -> void
 	match typ:
 		"vattenballong":
 			ljud.spela("plask", 1.0, 0.0, 0.08)
+		"vattenpistol":
+			ljud.spela("plask", 1.4, -4.0, 0.08)
+		"agg":
+			farg = Color(0.98, 0.8, 0.2)
+			ljud.spela("splatt", 1.6, 0.0, 0.08)
+		"kudde":
+			farg = Color(0.98, 0.98, 0.96)
+			ljud.spela("puff", 0.7, 2.0, 0.1)
+		"pokal":
+			farg = Color(1.0, 0.82, 0.3)
+			ljud.spela("vinst", 1.1, -6.0, 0.0)
 		"tomat":
 			farg = Color(0.85, 0.12, 0.05)
 			ljud.spela("splatt", 1.0, 0.0, 0.08)
@@ -1038,6 +1141,36 @@ func _projektil(typ: String) -> Node3D:
 			_klot_i(n3, 0.07, _enkel_mat(Color(0.85, 0.05, 0.1), 0.3), Vector3(0, 0.27, 0), Vector3.ONE)
 		"snoboll":
 			_klot_i(n3, 0.26, _enkel_mat(Color(0.96, 0.98, 1.0), 0.9), Vector3.ZERO, Vector3.ONE)
+		"agg":
+			_klot_i(n3, 0.15, _enkel_mat(Color(0.96, 0.9, 0.8), 0.45), Vector3.ZERO, Vector3(1, 1.3, 1))
+		"kudde":
+			# mjuk kudde i vitt och blått
+			_klot_i(n3, 0.4, _enkel_mat(Color(0.97, 0.97, 1.0), 0.95), Vector3.ZERO, Vector3(1.2, 0.35, 0.85))
+			_klot_i(n3, 0.3, _enkel_mat(Color(0.55, 0.7, 0.95), 0.95), Vector3(0, 0.04, 0), Vector3(1.25, 0.32, 0.9))
+		"pokal":
+			var guldp := _enkel_mat(Color(1.0, 0.78, 0.2), 0.22)
+			guldp.metallic = 0.85
+			var skal := MeshInstance3D.new()
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.24
+			cm.bottom_radius = 0.07
+			cm.height = 0.32
+			skal.mesh = cm
+			skal.material_override = guldp
+			skal.position = Vector3(0, 0.2, 0)
+			n3.add_child(skal)
+			_cyl_i(n3, 0.035, 0.2, guldp, Vector3(0, -0.06, 0))
+			_cyl_i(n3, 0.14, 0.06, _enkel_mat(Color(0.12, 0.1, 0.08), 0.5), Vector3(0, -0.18, 0))
+			for sx in [-1.0, 1.0]:
+				var ora := MeshInstance3D.new()
+				var tm := TorusMesh.new()
+				tm.inner_radius = 0.06
+				tm.outer_radius = 0.09
+				ora.mesh = tm
+				ora.material_override = guldp
+				ora.rotation.x = PI / 2
+				ora.position = Vector3(sx * 0.26, 0.22, 0)
+				n3.add_child(ora)
 		"flygplan":
 			n3.add_child(_pappersflygplan())
 		"hjarta":
@@ -1163,6 +1296,29 @@ func _stank(pos: Vector3, farg: Color, typ: String) -> void:
 			p.gravity = Vector3(0, -2.0, 0)
 			sm.radius = 0.08
 			sm.height = 0.05
+		"kudde":
+			# fjädrar som singlar ned
+			var q := QuadMesh.new()
+			q.size = Vector2(0.1, 0.22)
+			p.mesh = q
+			p.amount = 45
+			p.lifetime = 2.6
+			p.gravity = Vector3(0, -0.7, 0)
+			p.initial_velocity_min = 1.0
+			p.initial_velocity_max = 3.0
+			p.damping_min = 2.0
+			p.damping_max = 4.0
+			p.angular_velocity_min = -200.0
+			p.angular_velocity_max = 200.0
+			var fm := _enkel_mat(farg, 0.9)
+			fm.cull_mode = BaseMaterial3D.CULL_DISABLED
+			fm.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+			p.material_override = fm
+		"vattenpistol":
+			p.amount = 40
+			p.initial_velocity_max = 3.5
+			sm.radius = 0.045
+			sm.height = 0.09
 		"snoboll":
 			# snöpuffar: mjuka, långsamma
 			p.amount = 50
@@ -1192,7 +1348,7 @@ func _stank(pos: Vector3, farg: Color, typ: String) -> void:
 			hm.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 			hm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			p.material_override = hm
-		"krona":
+		"krona", "pokal":
 			p.amount = 40
 			p.gravity = Vector3(0, -1.0, 0)
 			p.initial_velocity_max = 2.5

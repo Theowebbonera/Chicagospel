@@ -21,8 +21,8 @@ signal lobby_starta
 signal lobby_lamna
 signal lobby_figur(figur: int)
 
-const KASTA := [["vattenballong", "Vattenballong"], ["tomat", "Tomat"], ["tarta", "Gräddtårta"], ["snoboll", "Snöboll"], ["flygplan", "Pappersflygplan"]]
-const HALSA := [["ros", "Ros"], ["hjarta", "Fingerkyss"], ["krona", "Krona"], ["konfetti", "Konfetti"], ["sexsju", "6-7"]]
+const KASTA := [["vattenpistol", "Vattenpistol"], ["vattenballong", "Vattenballong"], ["tomat", "Tomat"], ["agg", "Ägg"], ["tarta", "Gräddtårta"], ["snoboll", "Snöboll"], ["kudde", "Kudde"], ["flygplan", "Pappersflygplan"]]
+const HALSA := [["ros", "Ros"], ["hjarta", "Fingerkyss"], ["krona", "Krona"], ["pokal", "Pokal"], ["konfetti", "Konfetti"], ["sexsju", "6-7"]]
 
 const GULD := Color(0.95, 0.77, 0.36)
 const KRAM := Color(0.97, 0.94, 0.87)
@@ -57,6 +57,7 @@ var inst_start: Button
 var antal_text: Label
 var inst_tips: Label
 var kastmeny: PopupMenu
+var sexsju_knapp: Button
 var kast_mal := -1
 
 # hud
@@ -713,15 +714,15 @@ func _bygg_hud() -> void:
 	mh.offset_right = -20
 	mh.offset_top = 20
 	mh.add_theme_constant_override("separation", 8)
-	var sj := _knapp("6-7", func() -> void: egen_sexsju.emit())
-	sj.tooltip_text = "Gör 6-7 själv"
-	mh.add_child(sj)
+	sexsju_knapp = _knapp("6-7", func() -> void: egen_sexsju.emit())
+	sexsju_knapp.tooltip_text = "Gör 6-7 själv"
+	mh.add_child(sexsju_knapp)
 	mh.add_child(_knapp("Regler", func() -> void: visa_regler(get_parent().regler)))
 	mh.add_child(_knapp("Meny", func() -> void: visa_paus(true)))
 
 
 ## Liten meny när man klickar på en annan spelare.
-func visa_kastmeny(pos: Vector2, mal: int, namn: String) -> void:
+func visa_kastmeny(pos: Vector2, mal: int, namn: String, sexsju := "6-7") -> void:
 	if kastmeny == null:
 		kastmeny = PopupMenu.new()
 		kastmeny.theme = tema
@@ -736,7 +737,7 @@ func visa_kastmeny(pos: Vector2, mal: int, namn: String) -> void:
 		kastmeny.add_item(KASTA[i][1], i)
 	kastmeny.add_separator("Hälsa på " + namn)
 	for i in HALSA.size():
-		kastmeny.add_item(HALSA[i][1], KASTA.size() + i)
+		kastmeny.add_item(sexsju if HALSA[i][0] == "sexsju" else HALSA[i][1], KASTA.size() + i)
 	kast_mal = mal
 	kastmeny.position = Vector2i(pos)
 	kastmeny.reset_size()
@@ -746,8 +747,8 @@ func visa_kastmeny(pos: Vector2, mal: int, namn: String) -> void:
 ## Stänk över hela skärmen när någon kastar på en själv.
 func plask_skarm(typ: String) -> void:
 	var p := Plask.new()
-	p.farg = {"vattenballong": Color(0.55, 0.8, 1.0, 0.42), "tomat": Color(0.85, 0.1, 0.05, 0.75), "tarta": Color(0.99, 0.97, 0.92, 0.9), "snoboll": Color(0.95, 0.97, 1.0, 0.8), "flygplan": Color(1, 1, 1, 0.0), "ros": Color(1.0, 0.5, 0.65, 0.7), "hjarta": Color(1.0, 0.3, 0.45, 0.75), "krona": Color(1.0, 0.82, 0.3, 0.8), "konfetti": Color(1, 1, 1, 0.9)}.get(typ, Color(0.55, 0.8, 1.0, 0.55))
-	p.ros = typ in ["ros", "hjarta", "krona", "konfetti"]
+	p.farg = {"vattenballong": Color(0.55, 0.8, 1.0, 0.42), "vattenpistol": Color(0.55, 0.8, 1.0, 0.36), "agg": Color(0.99, 0.82, 0.2, 0.8), "kudde": Color(1, 1, 1, 0.9), "pokal": Color(1.0, 0.82, 0.3, 0.8), "tomat": Color(0.85, 0.1, 0.05, 0.75), "tarta": Color(0.99, 0.97, 0.92, 0.9), "snoboll": Color(0.95, 0.97, 1.0, 0.8), "flygplan": Color(1, 1, 1, 0.0), "ros": Color(1.0, 0.5, 0.65, 0.7), "hjarta": Color(1.0, 0.3, 0.45, 0.75), "krona": Color(1.0, 0.82, 0.3, 0.8), "konfetti": Color(1, 1, 1, 0.9)}.get(typ, Color(0.55, 0.8, 1.0, 0.55))
+	p.ros = typ in ["ros", "hjarta", "krona", "pokal", "konfetti", "kudde"]
 	p.konfetti = typ == "konfetti"
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(p)
@@ -759,9 +760,10 @@ func plask_skarm(typ: String) -> void:
 
 
 ## 6-7 för den egna platsen (ingen figur framför kameran): två handflator som gungar i otakt och en pratbubbla.
-func sexsju_skarm() -> void:
+func sexsju_skarm(text := "6-7") -> void:
 	var s := SexSju.new()
 	s.font = font_b
+	s.text = text
 	s.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(s)
 	s.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -771,9 +773,17 @@ func sexsju_skarm() -> void:
 	tw.tween_callback(s.queue_free)
 
 
+## Den egna 6-7-knappen visar vad den egna figuren säger (Kevin: "6-kugen").
+func satt_sexsju_text(text: String) -> void:
+	if sexsju_knapp:
+		sexsju_knapp.text = text
+		sexsju_knapp.tooltip_text = "Gör %s själv" % text
+
+
 class SexSju extends Control:
 	var t := 0.0
 	var font: Font
+	var text := "6-7"
 
 	func _process(dt: float) -> void:
 		t += dt
@@ -789,14 +799,16 @@ class SexSju extends Control:
 			for f in 4:
 				draw_circle(p + Vector2(-33.0 + f * 22.0, -55.0), 13.0, Color(0.98, 0.82, 0.66), true, -1.0, true)
 			draw_circle(p + Vector2(sida * -58.0, -8.0), 14.0, Color(0.98, 0.82, 0.66), true, -1.0, true)
-		var b := Rect2(mitt + Vector2(-110, -250), Vector2(220, 120))
+		var bredd := maxf(220.0, font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 80).x + 70.0)
+		var b := Rect2(mitt + Vector2(-bredd * 0.5, -250), Vector2(bredd, 120))
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(1, 1, 1, 0.95)
 		sb.set_corner_radius_all(40)
 		sb.anti_aliasing = true
 		draw_style_box(sb, b)
-		draw_colored_polygon(PackedVector2Array([b.position + Vector2(90, 118), b.position + Vector2(130, 118), b.position + Vector2(100, 160)]), Color(1, 1, 1, 0.95))
-		draw_string(font, b.position + Vector2(0, 88), "6-7", HORIZONTAL_ALIGNMENT_CENTER, 220, 80, Color(0.12, 0.1, 0.15))
+		var sp := b.position + Vector2(bredd * 0.5, 0)
+		draw_colored_polygon(PackedVector2Array([sp + Vector2(-20, 118), sp + Vector2(20, 118), sp + Vector2(-10, 160)]), Color(1, 1, 1, 0.95))
+		draw_string(font, b.position + Vector2(0, 88), text, HORIZONTAL_ALIGNMENT_CENTER, bredd, 80, Color(0.12, 0.1, 0.15))
 
 
 class Plask extends Control:
