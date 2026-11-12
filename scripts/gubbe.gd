@@ -31,6 +31,9 @@ var krona: Node3D
 var bubbla: Label3D
 var bas_yaw := 0.0
 var bas_y := 0.0
+## Sitter figuren vid bordet (main.gd)? Då vilar armarna på skinnkanten; på figurskärmen har den modellens egen
+## sittpose med armarna framåt (Theo 2026-11-12).
+var vid_bordet := false
 var huvud_y := 2.98
 
 
@@ -409,6 +412,8 @@ func _process(dt: float) -> void:
 		var slyft := _slaglyft(sida) if skratt_t > 0.0 else 0.0
 		var ik := _arm_pa_bordet(sida, till_skelett, slyft)
 		var w := clampf(upp * 1.5 + (gestv if sida == "r" else 0.0) + (1.0 if sexsju_t > 0.0 else 0.0), 0.0, 1.0)
+		if not vid_bordet:
+			w = 1.0
 		var r_over := Basis(ik[0].slerp(q.get_rotation_quaternion(), w))
 		var r_under := Basis(ik[1].slerp((under_q * q).get_rotation_quaternion(), w))
 		var r_hand := Basis(ik[1].slerp(h_q.get_rotation_quaternion(), w))
