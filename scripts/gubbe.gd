@@ -299,38 +299,38 @@ func huvudpos() -> Vector3:
 
 
 
-## Armarnas mål i figurens eget rum (-Z framåt, +X höger), uppmätta vid bordet (Theo 2026-11-12): figuren
-## sitter 7,4 från mitten, 0,2 under filten, skala 0,74 (main.gd); skinnkantens topp ligger 6,5 från mitten och
-## 0,42 över filten, händerna 5,85 från mitten. I figurens rum blir posen densamma vid bordet och på figurskärmen.
-const ARMBAGE_FRAM := 1.22   # (7,4 − 6,5) / 0,74
-const ARMBAGE_Y := 0.84      # (0,42 + 0,2) / 0,74
-const ARMBAGE_UT := 0.61     # 0,45 / 0,74 utanför axeln
-const HAND_FRAM := 2.09      # (7,4 − 5,85) / 0,74
-const HAND_Y := 0.5          # (0,17 + 0,2) / 0,74
-const HAND_UT := 0.68        # 0,5 / 0,74 från mitten
+## Bordets mått (bord.gd): skinnkantens topp ligger KANT_R från mitten och KANT_Y över filten.
+const KANT_R := 6.5
+const KANT_Y := 0.42
+const HAND_R := 5.85
+const HAND_Y := 0.17
 const HANDLED := -1.1  # handledens böj vid bordsslag (rad): fingrarna mot bordet
 
 
-## Armen i vila på bordet (Theo 2026-11-12): armbågen uppe på skinnkanten lite ut åt sidan, underarmen över
-## kanten och handen platt på filten innanför. Två led: överarmen siktar mot en punkt på kanten och underarmen
-## därifrån mot en punkt på filten; benens längder behålls. Målen räknas i figurens rum, så att posen blir
-## densamma var figuren än står (vid bordet och på figurskärmen). Ger vridningarna (i skelettets rum,
-## relativt vilan) för överarm och underarm/hand.
+## Armen i vila på bordet (Theo 2026-11-12, snyggare-3d): armbågen uppe på skinnkanten lite ut åt sidan,
+## underarmen över kanten och handen platt på filten innanför. Två led: överarmen siktar mot en punkt på
+## kanten och underarmen därifrån mot en punkt på filten; benens längder behålls. Ger vridningarna (i
+## skelettets rum, relativt vilan) för överarm och underarm/hand.
 func _arm_pa_bordet(sida: String, till_skelett: Transform3D, lyft := 0.0) -> Array:
+	var gp := global_position
+	var inat := Vector3(-gp.x, 0, -gp.z).normalized()
+	var hoger := inat.cross(Vector3.UP).normalized()
 	var sgn := 1.0 if sida == "r" else -1.0
 	var axel: Vector3 = vila["upperarm_" + sida].origin
 	var armbage_vila: Vector3 = vila["lowerarm_" + sida].origin
 	var hand_vila: Vector3 = vila["hand_" + sida].origin
 	var l1 := axel.distance_to(armbage_vila)
 	var l2 := armbage_vila.distance_to(hand_vila)
-	var axel_l := to_local(skelett.global_transform * axel)
-	var mal_e := Vector3(axel_l.x + sgn * ARMBAGE_UT, ARMBAGE_Y, -ARMBAGE_FRAM)
-	var mal_h := Vector3(sgn * HAND_UT, HAND_Y, -HAND_FRAM)
+	var axel_v := skelett.global_transform * axel
+	var sidled := (axel_v - Vector3(gp.x, axel_v.y, gp.z)).dot(hoger)
+	var mal_e := Vector3(0, KANT_Y, 0) - inat * KANT_R + hoger * (sidled + sgn * 0.45 * MODELL_SKALA / 4.2)
+	mal_e += hoger * (gp.dot(hoger))  # samma sidled som figuren (den sitter inte alltid mitt för)
+	var mal_h := Vector3(0, HAND_Y, 0) - inat * HAND_R + hoger * (gp.dot(hoger) + sgn * 0.5)
 	# bordsslag: knytnäven lyfts mot kroppen och upp, armbågen följer med en bit
-	mal_h += Vector3(0, lyft * 1.08, lyft * 0.34)
-	mal_e += Vector3(0, lyft * 0.34, 0)
-	var e_s := till_skelett * to_global(mal_e)
-	var h_s := till_skelett * to_global(mal_h)
+	mal_h += Vector3.UP * lyft * 0.8 + inat * -lyft * 0.25
+	mal_e += Vector3.UP * lyft * 0.25
+	var e_s := till_skelett * mal_e
+	var h_s := till_skelett * mal_h
 	var q_u := Quaternion((armbage_vila - axel).normalized(), (e_s - axel).normalized())
 	var armbage := axel + (e_s - axel).normalized() * l1
 	var under_vila := q_u * (hand_vila - armbage_vila).normalized()
