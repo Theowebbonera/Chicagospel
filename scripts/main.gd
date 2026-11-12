@@ -617,6 +617,7 @@ func _satt_upp_bord() -> void:
 		add_child(g)
 		g.bygg_figur(int(spelare[i].get("figur", (i * 5 + 2) % Figurer.antal())))
 		g.bas_y = -0.2
+		g.vid_bordet = true
 		g.position = _d(i) * R_GUBBE + Vector3.UP * g.bas_y
 		g.look_at(Vector3(0, g.bas_y, 0), Vector3.UP)
 		g.scale = Vector3.ONE * GUBBSKALA
