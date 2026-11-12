@@ -722,12 +722,19 @@ func _bygg_hud() -> void:
 
 
 ## Liten meny när man klickar på en annan spelare.
-func visa_kastmeny(pos: Vector2, mal: int, namn: String, sexsju := "6-7") -> void:
+## Klickmenyns id för Skratta (figurer med eget skratt, Lukas; Theo 2026-11-12).
+const SKRATTA_ID := 1000
+
+
+func visa_kastmeny(pos: Vector2, mal: int, namn: String, sexsju := "6-7", skratt := false) -> void:
 	if kastmeny == null:
 		kastmeny = PopupMenu.new()
 		kastmeny.theme = tema
 		kastmeny.add_theme_font_size_override("font_size", 30 if mobil else 22)
 		kastmeny.id_pressed.connect(func(id: int) -> void:
+			if id == SKRATTA_ID:
+				kasta.emit(kast_mal, "skratt")
+				return
 			var alla: Array = KASTA + HALSA
 			kasta.emit(kast_mal, alla[id][0]))
 		add_child(kastmeny)
@@ -738,6 +745,8 @@ func visa_kastmeny(pos: Vector2, mal: int, namn: String, sexsju := "6-7") -> voi
 	kastmeny.add_separator("Hälsa på " + namn)
 	for i in HALSA.size():
 		kastmeny.add_item(sexsju if HALSA[i][0] == "sexsju" else HALSA[i][1], KASTA.size() + i)
+	if skratt:
+		kastmeny.add_item("Skratta", SKRATTA_ID)
 	kast_mal = mal
 	kastmeny.position = Vector2i(pos)
 	kastmeny.reset_size()
