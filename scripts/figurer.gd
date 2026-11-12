@@ -1,7 +1,7 @@
 extends RefCounted
 ## Figurerna som kan sitta vid bordet: realistiska människor från Blender (assets/gubbar/, blender/gubbar.py),
 ## som gubbe.gd styr via skelettet. "sexsju" = vad figuren säger när den gör 6-7-rörelsen (standard "6-7").
-## "skratt" = figurens eget skratt (ljudfil); den som spelar figuren får knappen Skratta (Theo 2026-11-12).
+## "skratt" = figurens eget skratt (ljudfil): klicka på figuren och välj Skratta (Theo 2026-11-12).
 ## "skratt_slag" = när i ljudet han bankar i bordet (s), uppmätt ur ljudfilens smällar; handen slår ned då.
 
 const FIGURER := [
