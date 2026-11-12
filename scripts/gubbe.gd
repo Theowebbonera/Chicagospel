@@ -23,6 +23,9 @@ var gradde_t := 0.0
 var krona_t := 0.0
 var rodnad := 0.0
 var sexsju_t := 0.0
+var skratt_t := 0.0
+var skratt_tid := 0.0  # tid sedan rörelsen började
+var skratt_slag: Array = []  # när handen slår i bordet, räknat från rörelsens början
 var gradde: Node3D
 var krona: Node3D
 var bubbla: Label3D
@@ -201,6 +204,29 @@ func ledsen() -> void:
 	skak = 0.8
 
 
+## Skratt (Lukas): huvudet bakåt och axlarna guppar så länge skrattet hörs.
+func skratta(langd: float, slagtider: Array = [], fore := 0.0) -> void:
+	skratt_t = langd + fore
+	skratt_tid = 0.0
+	skratt_slag = slagtider.map(func(t): return float(t) + fore)
+
+
+## Hur högt handen är lyft för bordsslag (0 = på filten). Händerna slår växelvis, höger först: handen går upp
+## i god tid före smällen och slår ned på den, med en liten studs efteråt.
+func _slaglyft(sida: String) -> float:
+	var lyft := 0.0
+	for i in skratt_slag.size():
+		if (i % 2 == 0) != (sida == "r"):
+			continue
+		var d: float = skratt_slag[i] - skratt_tid
+		if d >= 0.0 and d < 0.4:
+			# upp under 0,2 s, kvar högst upp en stund, ned under de sista 0,07 s
+			lyft = maxf(lyft, smoothstep(0.4, 0.2, d) * smoothstep(0.0, 0.07, d))
+		elif d < 0.0 and d > -0.12:
+			lyft = maxf(lyft, sin(-d / 0.12 * PI) * 0.12)
+	return lyft
+
+
 ## 6-7: båda handflatorna uppåt och händerna gungar upp och ned i otakt, med en pratbubbla.
 func sexsju() -> void:
 	sexsju_t = 2.4
@@ -273,6 +299,45 @@ func huvudpos() -> Vector3:
 
 
 
+## Bordets mått (bord.gd): skinnkantens topp ligger KANT_R från mitten och KANT_Y över filten.
+const KANT_R := 6.5
+const KANT_Y := 0.42
+const HAND_R := 5.85
+const HAND_Y := 0.17
+const HANDLED := -1.1  # handledens böj vid bordsslag (rad): fingrarna mot bordet
+
+
+## Armen i vila på bordet (Theo 2026-11-12, snyggare-3d): armbågen uppe på skinnkanten lite ut åt sidan,
+## underarmen över kanten och handen platt på filten innanför. Två led: överarmen siktar mot en punkt på
+## kanten och underarmen därifrån mot en punkt på filten; benens längder behålls. Ger vridningarna (i
+## skelettets rum, relativt vilan) för överarm och underarm/hand.
+func _arm_pa_bordet(sida: String, till_skelett: Transform3D, lyft := 0.0) -> Array:
+	var gp := global_position
+	var inat := Vector3(-gp.x, 0, -gp.z).normalized()
+	var hoger := inat.cross(Vector3.UP).normalized()
+	var sgn := 1.0 if sida == "r" else -1.0
+	var axel: Vector3 = vila["upperarm_" + sida].origin
+	var armbage_vila: Vector3 = vila["lowerarm_" + sida].origin
+	var hand_vila: Vector3 = vila["hand_" + sida].origin
+	var l1 := axel.distance_to(armbage_vila)
+	var l2 := armbage_vila.distance_to(hand_vila)
+	var axel_v := skelett.global_transform * axel
+	var sidled := (axel_v - Vector3(gp.x, axel_v.y, gp.z)).dot(hoger)
+	var mal_e := Vector3(0, KANT_Y, 0) - inat * KANT_R + hoger * (sidled + sgn * 0.45 * MODELL_SKALA / 4.2)
+	mal_e += hoger * (gp.dot(hoger))  # samma sidled som figuren (den sitter inte alltid mitt för)
+	var mal_h := Vector3(0, HAND_Y, 0) - inat * HAND_R + hoger * (gp.dot(hoger) + sgn * 0.5)
+	# bordsslag: knytnäven lyfts mot kroppen och upp, armbågen följer med en bit
+	mal_h += Vector3.UP * lyft * 0.8 + inat * -lyft * 0.25
+	mal_e += Vector3.UP * lyft * 0.25
+	var e_s := till_skelett * mal_e
+	var h_s := till_skelett * mal_h
+	var q_u := Quaternion((armbage_vila - axel).normalized(), (e_s - axel).normalized())
+	var armbage := axel + (e_s - axel).normalized() * l1
+	var under_vila := q_u * (hand_vila - armbage_vila).normalized()
+	var q_f := Quaternion(under_vila, (h_s - armbage).normalized()) * q_u
+	return [q_u, q_f]
+
+
 ## Vrider ett ben i skelettets rum: globalt läge = q * vila, räknat mot förälderns (nya) globala läge.
 func _vrid(namn: String, q: Basis, foralder_global: Basis) -> Basis:
 	var ny: Basis = q * vila[namn].basis
@@ -301,12 +366,18 @@ func _process(dt: float) -> void:
 	skak = maxf(skak - dt * 0.9, 0.0)
 	# andning: bröstet höjs lite
 	var brost := _vrid("spine_03", Basis(Vector3.RIGHT, 0.015 * andas), _foralder_vila("spine_03"))
-	var halv := Basis(Vector3.UP, vrid_y * 0.4) * Basis(Vector3.RIGHT, -nick * 0.4)
-	var hel := Basis(Vector3.UP, vrid_y) * Basis(Vector3.RIGHT, -nick)
+	# skratt: huvudet lutas bakåt och guppar i takt med skrattet
+	var skratt_nick := 0.0
+	if skratt_t > 0.0:
+		skratt_t -= dt
+		skratt_tid += dt
+		skratt_nick = (0.28 + 0.08 * sin(tid * 15.0)) * minf(skratt_t * 2.0, 1.0)
+	var halv := Basis(Vector3.UP, vrid_y * 0.4) * Basis(Vector3.RIGHT, -(nick + skratt_nick) * 0.4)
+	var hel := Basis(Vector3.UP, vrid_y) * Basis(Vector3.RIGHT, -(nick + skratt_nick))
 	var nacke := _vrid("neck_01", halv, brost)
 	_vrid("head", hel, nacke)
 	# hopp/jubel
-	position.y = bas_y + absf(sin(tid * 9.0)) * 0.35 * hopp
+	position.y = bas_y + absf(sin(tid * 9.0)) * 0.35 * hopp + (absf(sin(tid * 15.0)) * 0.05 if skratt_t > 0.0 else 0.0)
 	hopp = maxf(hopp - dt * 0.7, 0.0)
 	glad = maxf(glad - dt * 0.4, 0.0)
 	# armar: gest med höger arm, båda upp vid jubel, 6-7 med handflatorna upp
@@ -317,26 +388,39 @@ func _process(dt: float) -> void:
 		if gest_t > 0.6:
 			gest_t = -1.0
 	var upp := hopp
+	var till_skelett := skelett.global_transform.affine_inverse()
 	for s in [["r", -1.0], ["l", 1.0]]:
 		var sida: String = s[0]
 		var sx: float = s[1]
-		# överarmen svingas framåt och upp kring sidledsaxeln (negativ vinkel = framåt/upp), ut åt sidan vid jubel
+		# gesten som förut: överarmen svingas framåt och upp kring sidledsaxeln (negativ vinkel = framåt/upp),
+		# ut åt sidan vid jubel
 		var lyft := upp * 2.3 + (gestv * 1.3 if sida == "r" else 0.0)
 		var q := Basis(Vector3.FORWARD, sx * upp * 0.35) * Basis(Vector3.RIGHT, -lyft)
-		var ov := _vrid("upperarm_" + sida, q, _foralder_vila("upperarm_" + sida))
 		var under_q := Basis()
 		if sexsju_t > 0.0:
 			# underarmarna gungar upp och ned i otakt
 			under_q = Basis(Vector3.RIGHT, -(0.35 + sin(tid * 13.0 + (0.0 if sida == "r" else PI)) * 0.3))
-		# underarmen följer överarmen: dess vila vrids med överarmen
-		var u_ny: Basis = under_q * q * vila["lowerarm_" + sida].basis
-		skelett.set_bone_pose_rotation(ben["lowerarm_" + sida], (ov.inverse() * u_ny).get_rotation_quaternion())
 		var h_q := under_q * q
 		if sexsju_t > 0.0:
 			# handflatorna uppåt: handen rullas nästan ett halvt varv kring underarmen
-			var axel: Vector3 = (u_ny * Vector3.UP).normalized()
+			var axel: Vector3 = ((under_q * q * vila["lowerarm_" + sida].basis) * Vector3.UP).normalized()
 			h_q = Basis(axel, PI * 0.9 * -sx) * h_q
-		skelett.set_bone_pose_rotation(ben["hand_" + sida], (u_ny.inverse() * (h_q * vila["hand_" + sida].basis)).get_rotation_quaternion())
+		# vilan: underarmarna på skinnkanten och händerna på filten (IK), och gesten blandas in ovanpå
+		var slyft := _slaglyft(sida) if skratt_t > 0.0 else 0.0
+		var ik := _arm_pa_bordet(sida, till_skelett, slyft)
+		var w := clampf(upp * 1.5 + (gestv if sida == "r" else 0.0) + (1.0 if sexsju_t > 0.0 else 0.0), 0.0, 1.0)
+		var r_over := Basis(ik[0].slerp(q.get_rotation_quaternion(), w))
+		var r_under := Basis(ik[1].slerp((under_q * q).get_rotation_quaternion(), w))
+		var r_hand := Basis(ik[1].slerp(h_q.get_rotation_quaternion(), w))
+		if slyft > 0.0:
+			# handleden böjs så att handen pekar ned mot bordet inför slaget
+			var fram: Vector3 = (r_under * (vila["hand_" + sida].origin - vila["lowerarm_" + sida].origin)).normalized()
+			var led := fram.cross(Vector3.UP).normalized()
+			r_hand = Basis(led, HANDLED * slyft) * r_hand
+		var ov := _vrid("upperarm_" + sida, r_over, _foralder_vila("upperarm_" + sida))
+		var u_ny: Basis = r_under * vila["lowerarm_" + sida].basis
+		skelett.set_bone_pose_rotation(ben["lowerarm_" + sida], (ov.inverse() * u_ny).get_rotation_quaternion())
+		skelett.set_bone_pose_rotation(ben["hand_" + sida], (u_ny.inverse() * (r_hand * vila["hand_" + sida].basis)).get_rotation_quaternion())
 	if sexsju_t > 0.0:
 		sexsju_t -= dt
 		bubbla.scale = Vector3.ONE * (1.0 + 0.08 * sin(tid * 13.0))

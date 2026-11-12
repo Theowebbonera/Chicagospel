@@ -388,8 +388,14 @@ func _drag(id: int, b: Dictionary, p: int, d: Dictionary) -> void:
 func _kasta(id: int, b: Dictionary, p: int, d: Dictionary) -> void:
 	var till := int(d.get("till", -1))
 	var vad := str(d.get("vad", ""))
-	# 6-7 får man göra själv (till sin egen plats), allt annat kastas på någon annan
-	if till < 0 or till >= b.platser.size() or not vad in Natverk.KASTTYPER or (till == p and vad != "sexsju"):
+	# 6-7 får man göra själv (till sin egen plats) eller mot andra. Skratt: man klickar på en figur som har ett
+	# eget skratt (Lukas) och han skrattar. Allt annat kastas på någon annan.
+	var fel: bool = till < 0 or till >= b.platser.size() or not vad in Natverk.KASTTYPER
+	if not fel and vad == "skratt":
+		fel = Figurer.skratt(int(b.platser[till].get("figur", -1))) == ""
+	elif not fel:
+		fel = till == p and vad != "sexsju"
+	if fel:
 		_fel(id, "Går inte att kasta så")
 		return
 	var senast: float = b.kast.get(p, -100.0)

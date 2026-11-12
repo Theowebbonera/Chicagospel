@@ -106,6 +106,7 @@ func _ready() -> void:
 	kam.near = 0.1
 	kam.far = 120.0
 	add_child(kam)
+	_vinjett()
 	# mjukt ljus för handen man håller (den ligger utanför lampans kägla)
 	var handljus := OmniLight3D.new()
 	handljus.position = Vector3(0.0, 0.4, -3.4)
@@ -495,7 +496,7 @@ func _unhandled_input(e: InputEvent) -> void:
 		if hover_id >= 0:
 			_klicka(hover_id)
 		elif hover_gubbe >= 0:
-			ui.visa_kastmeny(e.position, hover_gubbe, spelare[hover_gubbe].namn, Figurer.sexsju_text(int(spelare[hover_gubbe].get("figur", 0))))
+			ui.visa_kastmeny(e.position, hover_gubbe, spelare[hover_gubbe].namn, Figurer.sexsju_text(int(spelare[hover_gubbe].get("figur", 0))), Figurer.skratt(int(spelare[hover_gubbe].get("figur", 0))) != "")
 	elif e is InputEventKey and e.pressed and not e.echo:
 		if e.keycode == KEY_ESCAPE:
 			ui.visa_paus(not ui.ar_pausad)
@@ -815,6 +816,31 @@ func _visa_tur(p: int) -> void:
 	_tavla()
 
 
+## Mjuk vinjett och lite filmkorn under gränssnittet (CanvasLayer under UI, båda renderarna; snyggare-3d).
+func _vinjett() -> void:
+	var lager := CanvasLayer.new()
+	lager.layer = -1
+	var r := ColorRect.new()
+	r.set_anchors_preset(Control.PRESET_FULL_RECT)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sh := Shader.new()
+	sh.code = """
+shader_type canvas_item;
+void fragment() {
+	vec2 d = UV - 0.5;
+	d.x *= 1.4;
+	float v = smoothstep(0.45, 0.95, length(d));
+	float korn = fract(sin(dot(UV * 1000.0 + TIME, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+	COLOR = vec4(vec3(0.0), v * 0.4 + korn * 0.02);
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	r.material = m
+	lager.add_child(r)
+	add_child(lager)
+
+
 ## Ungefär där en spelares huvud är (kameran för den som tittar).
 func _sittplats(p: int) -> Vector3:
 	if p == betraktare:
@@ -891,6 +917,9 @@ func _kasta(fran: int, till: int, typ: String, svar: bool) -> void:
 	var k := korning
 	if typ == "sexsju":
 		_sexsju(till)
+		return
+	if typ == "skratt":
+		_skratt(till)
 		return
 	if typ == "vattenpistol":
 		_vattenpistol(fran, till, svar)
@@ -1051,6 +1080,36 @@ func _egen_sexsju() -> void:
 		return
 	kastsparr = KASTSPARR
 	_sexsju(betraktare)
+
+
+## Skratta (Lukas): klicka på figuren och välj Skratta. Han skrattar, bankar i bordet i takt med smällarna i
+## ljudet, och alla vid bordet hör det (Theo 2026-11-12).
+var skratt_spelare: AudioStreamPlayer
+
+
+func _skratt(p: int) -> void:
+	if p < 0 or p >= spelare.size():
+		return
+	var fil := Figurer.skratt(int(spelare[p].get("figur", 0)))
+	if fil == "":
+		return
+	if skratt_spelare == null:
+		skratt_spelare = AudioStreamPlayer.new()
+		skratt_spelare.bus = ljud.get_child(0).bus if ljud.get_child_count() > 0 else &"Master"
+		add_child(skratt_spelare)
+	skratt_spelare.stream = load(fil)
+	var slag: Array = Figurer.skratt_slag(int(spelare[p].get("figur", 0)))
+	var langd: float = skratt_spelare.stream.get_length()
+	if p < gubbar.size() and p != betraktare:
+		# handen ska hinna upp före första smällen: rörelsen börjar, ljudet en kvarts sekund senare
+		gubbar[p].skratta(langd, slag, SKRATT_FORE)
+		get_tree().create_timer(SKRATT_FORE, false).timeout.connect(skratt_spelare.play)
+	else:
+		skratt_spelare.play()
+		ui.visa_banner("Haha!", spelare[p].namn + " skrattar", UI.KRAM, 1.6)
+
+
+const SKRATT_FORE := 0.25
 
 
 func _sexsju(p: int) -> void:

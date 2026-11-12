@@ -13,7 +13,7 @@ const WEBB_ADRESS := ""
 const Motor := preload("res://scripts/motor.gd")
 
 const KODTECKEN := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-const KASTTYPER := ["vattenballong", "vattenpistol", "tomat", "agg", "tarta", "snoboll", "kudde", "flygplan", "ros", "hjarta", "krona", "pokal", "konfetti", "sexsju"]
+const KASTTYPER := ["vattenballong", "vattenpistol", "tomat", "agg", "tarta", "snoboll", "kudde", "flygplan", "ros", "hjarta", "krona", "pokal", "konfetti", "sexsju", "skratt"]
 
 
 ## Körs vi i en mobilwebbläsare (eller på mobil)?

@@ -4,6 +4,12 @@ extends Node3D
 
 const BREDD := 0.8
 const HOJD := 1.12
+## Kortets tjocklek och hörnradie (22 av 300 px i kortbild.gd), för kanten (Theo 2026-11-12, snyggare-3d).
+const TJOCK := 0.006
+const HORN := 0.0587
+
+static var _kant_mesh: ArrayMesh
+static var _kant_mat: StandardMaterial3D
 
 var id := -1
 var fram: MeshInstance3D
@@ -32,8 +38,15 @@ func skapa(kort_id: int, framsida: Texture2D, baksida: Texture2D, glod_mat: Mate
 	bak.mesh = q
 	bak.material_override = mat_bak
 	bak.rotation.y = PI
-	bak.position.z = -0.0015
+	bak.position.z = -TJOCK
 	add_child(bak)
+	# kanten: ett smalt band runt kortet med samma rundade hörn som bilden
+	var kant := MeshInstance3D.new()
+	kant.mesh = _kant()
+	kant.material_override = _kant_material()
+	kant.position.z = -TJOCK * 0.5
+	kant.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(kant)
 	var gq := QuadMesh.new()
 	gq.size = Vector2(BREDD + 0.2, HOJD + 0.2)
 	glod = MeshInstance3D.new()
@@ -45,6 +58,43 @@ func skapa(kort_id: int, framsida: Texture2D, baksida: Texture2D, glod_mat: Mate
 	add_child(glod)
 
 
+## Bandet runt kortet (delas av alla 52): en rundad rektangel, extruderad TJOCK i Z.
+static func _kant() -> ArrayMesh:
+	if _kant_mesh:
+		return _kant_mesh
+	var pts: PackedVector2Array = []
+	var hx := BREDD * 0.5 - HORN
+	var hy := HOJD * 0.5 - HORN
+	var mitt := [Vector2(hx, hy), Vector2(-hx, hy), Vector2(-hx, -hy), Vector2(hx, -hy)]
+	for h in 4:
+		for i in 7:
+			var a := PI * 0.5 * h + PI * 0.5 * float(i) / 6.0
+			pts.append(mitt[h] + Vector2(cos(a), sin(a)) * HORN)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var z := TJOCK * 0.5
+	for i in pts.size():
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[(i + 1) % pts.size()]
+		var n := Vector3(b.y - a.y, -(b.x - a.x), 0).normalized()
+		for v in [Vector3(a.x, a.y, z), Vector3(b.x, b.y, z), Vector3(b.x, b.y, -z),
+				Vector3(a.x, a.y, z), Vector3(b.x, b.y, -z), Vector3(a.x, a.y, -z)]:
+			st.set_normal(n)
+			st.add_vertex(v)
+	_kant_mesh = st.commit()
+	return _kant_mesh
+
+
+static func _kant_material() -> StandardMaterial3D:
+	if _kant_mat:
+		return _kant_mat
+	_kant_mat = StandardMaterial3D.new()
+	_kant_mat.albedo_color = Color(0.9, 0.88, 0.83)
+	_kant_mat.roughness = 0.8
+	_kant_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return _kant_mat
+
+
 func _mat(t: Texture2D) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = t
@@ -52,9 +102,12 @@ func _mat(t: Texture2D) -> StandardMaterial3D:
 	m.alpha_scissor_threshold = 0.5
 	m.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-	# matt yta: kort som lutas mot kameran ska inte spegla lampan
-	m.roughness = 0.72
-	m.metallic_specular = 0.15
+	# matt yta: kort som lutas mot kameran ska inte spegla lampan, men en svag lackglans i kanten av sheenen
+	m.roughness = 0.62
+	m.metallic_specular = 0.25
+	m.rim_enabled = true
+	m.rim = 0.12
+	m.rim_tint = 0.3
 	return m
 
 

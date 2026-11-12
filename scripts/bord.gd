@@ -1,6 +1,11 @@
 extends Node3D
 ## Rummet och bordet: runt kortbord med grön filt, stoppad läderkant, träsarg, hängande lampa med mjuka skuggor,
 ## mörkt rum med trägolv. Allt byggs i kod.
+## Grenen snyggare-3d (Theo 2026-11-12): rummet runt bordet (rum.gd), skinn med narv och sömmar, mässingslist,
+## rök i luften som visar lampans kägla, SSIL och en reflektionsprob. Webben (Compatibility)
+## får det som fungerar där: rummet, materialen, glöd och tonmappning.
+
+const Rum := preload("res://scripts/rum.gd")
 
 const RADIE := 6.2
 
@@ -18,6 +23,21 @@ func _ready() -> void:
 	_bord()
 	_lampa()
 	_golv()
+	add_child(Rum.new())
+	_prob()
+
+
+## Reflektionsprob över bordet: lack, skinn och mässing speglar rummet i stället för svart.
+func _prob() -> void:
+	var p := ReflectionProbe.new()
+	p.size = Vector3(50, 26, 50)
+	p.position = Vector3(0, 2.0, 0)
+	p.interior = true
+	p.box_projection = true
+	p.update_mode = ReflectionProbe.UPDATE_ONCE
+	p.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
+	p.intensity = 0.8
+	add_child(p)
 
 
 func _miljo() -> void:
@@ -26,19 +46,38 @@ func _miljo() -> void:
 	env.background_color = Color(0.018, 0.015, 0.013)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.55, 0.47, 0.38)
-	env.ambient_light_energy = 0.4
+	env.ambient_light_energy = 0.46
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 1.05
+	env.tonemap_exposure = 1.3
 	env.ssao_enabled = not OS.has_feature("web")
 	env.ssao_radius = 0.6
-	env.ssao_intensity = 1.6
-	env.glow_enabled = not OS.has_feature("web")
-	env.glow_intensity = 0.3
-	env.glow_bloom = 0.04
-	env.glow_hdr_threshold = 1.6
+	env.ssao_intensity = 1.8
+	env.ssao_detail = 0.7
+	# indirekt ljus i skärmrummet: filtens grönska och lampans sken studsar upp på figurerna och kanten
+	env.ssil_enabled = not ar_compat()
+	env.ssil_radius = 4.0
+	env.ssil_intensity = 0.9
+	env.glow_enabled = true
+	env.glow_intensity = 0.45
+	env.glow_bloom = 0.06
+	env.glow_hdr_threshold = 1.2
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+	# lite rök i luften: lampans kägla syns och bakgrunden blir djupare (bara Forward+)
+	if not ar_compat():
+		env.volumetric_fog_enabled = true
+		env.volumetric_fog_density = 0.0055
+		env.volumetric_fog_albedo = Color(0.9, 0.82, 0.7)
+		env.volumetric_fog_anisotropy = 0.6
+		env.volumetric_fog_length = 48.0
+		env.volumetric_fog_ambient_inject = 0.12
+	else:
+		env.fog_enabled = true
+		env.fog_light_color = Color(0.06, 0.045, 0.035)
+		env.fog_density = 0.012
+		env.fog_sky_affect = 0.0
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.06
-	env.adjustment_contrast = 1.04
+	env.adjustment_saturation = 1.08
+	env.adjustment_contrast = 1.06
 	miljo = WorldEnvironment.new()
 	miljo.environment = env
 	add_child(miljo)
@@ -74,6 +113,49 @@ void fragment() {
 	m.shader = sh
 	m.set_shader_parameter("brus", _brus(0.02, 4, 256))
 	m.set_shader_parameter("fin", _brus(0.5, 2, 256))
+	return m
+
+
+## Skinnet på kanten: narv i normalkartan, två sömmar runt om och lite slitage där händerna vilar.
+func _lader_mat() -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+uniform sampler2D narv : filter_linear_mipmap, repeat_enable;
+uniform sampler2D brus : filter_linear_mipmap, repeat_enable;
+varying vec3 vp;
+void vertex() { vp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	float a = atan(vp.z, vp.x);
+	float r = length(vp.xz);
+	vec2 p = vec2(a * 6.2, vp.y + r);
+	float n = texture(narv, p * 3.0).r;
+	float s = texture(brus, p * 0.3).r;
+	vec3 c = vec3(0.15, 0.06, 0.03) * (0.8 + 0.3 * s);
+	// slitage: ljusare och mattare uppe på kanten
+	float topp = smoothstep(0.15, 0.4, vp.y);
+	c = mix(c, c * 1.2, topp * s * 0.5);
+	// sömmar: två streckade ringar i ljust garn
+	float som = 0.0;
+	for (int i = 0; i < 2; i++) {
+		float rr = (i == 0) ? 6.32 : 6.78;
+		float lin = 1.0 - smoothstep(0.0, 0.012, abs(r - rr));
+		float streck = step(0.35, fract(a * 900.0 / 6.2832));
+		som += lin * streck * step(0.05, vp.y);
+	}
+	c = mix(c, vec3(0.62, 0.5, 0.36), clamp(som, 0.0, 1.0));
+	ALBEDO = c;
+	ROUGHNESS = mix(0.42, 0.62, topp * s);
+	CLEARCOAT = 0.35;
+	CLEARCOAT_ROUGHNESS = 0.4;
+	NORMAL_MAP = vec3(0.5 + (n - 0.5) * 0.5, 0.5 + (n - 0.5) * 0.5, 1.0);
+	NORMAL_MAP_DEPTH = 1.0;
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	m.set_shader_parameter("narv", _brus(0.9, 2, 256))
+	m.set_shader_parameter("brus", _brus(0.08, 3, 128))
 	return m
 
 
@@ -143,14 +225,20 @@ func _bord() -> void:
 	t.outer_radius = RADIE + 0.75
 	t.rings = 128
 	t.ring_segments = 24
-	var lader := StandardMaterial3D.new()
-	lader.albedo_color = Color(0.17, 0.075, 0.04)
-	lader.roughness = 0.38
-	lader.clearcoat_enabled = true
-	lader.clearcoat = 0.4
-	lader.clearcoat_roughness = 0.35
-	var kant := _mesh(t, lader, Vector3(0, 0.05, 0))
+	var kant := _mesh(t, _lader_mat(), Vector3(0, 0.05, 0))
 	kant.scale = Vector3(1, 0.75, 1)
+	# mässingslist mellan filten och skinnet
+	var ms := TorusMesh.new()
+	ms.inner_radius = RADIE - 0.1
+	ms.outer_radius = RADIE + 0.02
+	ms.rings = 128
+	ms.ring_segments = 8
+	var mm := StandardMaterial3D.new()
+	mm.albedo_color = Color(0.8, 0.6, 0.27)
+	mm.metallic = 1.0
+	mm.roughness = 0.25
+	var list := _mesh(ms, mm, Vector3(0, 0.02, 0))
+	list.scale = Vector3(1, 0.5, 1)
 	# träsarg under kanten
 	var s := CylinderMesh.new()
 	s.top_radius = RADIE + 0.7
@@ -195,6 +283,7 @@ func _lampa() -> void:
 	lampa.light_size = 0.6
 	lampa.shadow_bias = 0.02
 	lampa.shadow_normal_bias = 0.6
+	lampa.light_volumetric_fog_energy = 1.4
 	if ar_compat():
 		# Compatibility (webben): skuggor från spotlampan blir helt svarta där, så lampan lyser utan skuggor
 		lampa.shadow_enabled = false
@@ -210,8 +299,31 @@ func _lampa() -> void:
 	skm.albedo_color = Color(0.06, 0.2, 0.12)
 	skm.metallic = 0.6
 	skm.roughness = 0.35
-	skm.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_mesh(sk, skm, Vector3(0, 12.4, 0), false)
+	# skärmens insida: vit emalj som lyser upp av glödlampan
+	var insida := StandardMaterial3D.new()
+	insida.albedo_color = Color(1.0, 0.95, 0.85)
+	insida.emission_enabled = true
+	insida.emission = Color(1.0, 0.82, 0.55)
+	insida.emission_energy_multiplier = 1.4
+	insida.cull_mode = BaseMaterial3D.CULL_FRONT
+	_mesh(sk, insida, Vector3(0, 12.4, 0), false)
+	# mässingskant och sladd upp mot taket
+	var ring := TorusMesh.new()
+	ring.inner_radius = 1.86
+	ring.outer_radius = 1.96
+	var rm := StandardMaterial3D.new()
+	rm.albedo_color = Color(0.8, 0.6, 0.27)
+	rm.metallic = 1.0
+	rm.roughness = 0.3
+	_mesh(ring, rm, Vector3(0, 11.8, 0), false)
+	var sladd := CylinderMesh.new()
+	sladd.top_radius = 0.04
+	sladd.bottom_radius = 0.04
+	sladd.height = 4.0
+	var sm := StandardMaterial3D.new()
+	sm.albedo_color = Color(0.05, 0.05, 0.05)
+	_mesh(sladd, sm, Vector3(0, 15.0, 0), false)
 	var gl := SphereMesh.new()
 	gl.radius = 0.32
 	gl.height = 0.64
