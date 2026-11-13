@@ -1309,9 +1309,6 @@ func _bygg_online() -> void:
 	kv.alignment = BoxContainer.ALIGNMENT_CENTER
 	kv.add_theme_constant_override("separation", 20)
 	kc.add_child(kv)
-	var kt := _lbl("Chicago", 120, true, GULD)
-	kt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	kv.add_child(kt)
 	var kk := _knapp("Klicka för att börja", func() -> void: _klick_start(), 32)
 	kk.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	kv.add_child(kk)
