@@ -6,7 +6,8 @@ extends RefCounted
 ## Reglerna (spelregler.org/plump-regler): varje giv har ett visst antal kort, först 10 (eller så många som leken
 ## räcker till), sedan ett färre per giv ner till 1 och upp igen. Alla ser sina kort och bjuder hur många stick de
 ## ska ta, med början hos spelaren efter given. Givaren bjuder sist och får inte bjuda så att buden tillsammans går
-## jämnt ut med antalet stick. Man måste bekänna färg, ingen trumf: högsta kortet i utspelad färg tar sticket.
+## jämnt ut med antalet stick. Den som bjudit högst spelar ut först (vid lika den närmast till vänster om given).
+## Man måste bekänna färg, ingen trumf: högsta kortet i utspelad färg tar sticket.
 ## Exakt bud ger 10 + budet (0 stick ger 10), annars en plump och inga poäng. Flest poäng efter sista given vinner.
 ## Med 1 kort ser man sitt kort och bjuder sedan, som vanligt (Theo: "man får se och sen välja").
 
@@ -178,10 +179,20 @@ func bjud(p: int, b: int) -> bool:
 	bud[p] = b
 	_h({"typ": "bud", "spelare": p, "bud": b})
 	if p == givare:
-		_till_stick(forhand())
+		_till_stick(forsta_utspelare())
 	else:
 		tur = (tur + 1) % n
 	return true
+
+
+## Den som bjudit högst spelar ut första sticket. Vid lika den av dem som sitter närmast till vänster om given
+## (Theo 2026-11-13).
+func forsta_utspelare() -> int:
+	var bast := forhand()
+	for p in i_ordning(forhand()):
+		if bud[p] > bud[bast]:
+			bast = p
+	return bast
 
 
 # ------------------------------------------------------------------ stick

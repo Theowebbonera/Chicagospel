@@ -1748,6 +1748,8 @@ func _handelse(e: Dictionary, id: int) -> void:
 				for i in n:
 					bytes_info[i] = ""
 			var t := "Stick %d av %d" % [e.nr, int(e.get("av", 5))]
+			if _ar_plump() and e.nr == 1:
+				ui.logga("%s bjöd högst och spelar ut." % spelare[e.utspelare].namn)
 			if motor.chicago >= 0 and not motor.chicago_sprack:
 				t += " · Chicago: %s" % spelare[motor.chicago].namn
 			ui.satt_fas(t)

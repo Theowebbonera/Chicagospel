@@ -278,7 +278,7 @@ func plump_beskrivning() -> String:
 	t += "[b]Bud:[/b] alla ser sina kort. Spelaren efter given bjuder först hur många stick den ska ta, 0 till antalet kort, och turen går medsols. Givaren bjuder sist och får inte bjuda så att buden tillsammans blir lika många som sticken: någon måste missa.
 
 "
-	t += "[b]Sticken:[/b] spelaren efter given spelar ut först. Man måste bekänna färg om man kan, annars får man lägga vilket kort som helst. Det finns ingen trumf: högsta kortet i utspelad färg tar sticket, och den som tar sticket spelar ut nästa.
+	t += "[b]Sticken:[/b] den som har bjudit högst spelar ut första sticket. Har flera bjudit lika högt börjar den av dem som sitter närmast till vänster om given. Man måste bekänna färg om man kan, annars får man lägga vilket kort som helst. Det finns ingen trumf: högsta kortet i utspelad färg tar sticket, och den som tar sticket spelar ut nästa.
 
 "
 	t += "[b]Poäng:[/b] den som tar exakt så många stick som den bjöd får 10 + budet, alltså 10 för noll stick, 13 för tre. Den som tar för många eller för få får en plump och inga poäng den given.
