@@ -13,6 +13,7 @@ const Bord := preload("res://scripts/bord.gd")
 const Ljud := preload("res://scripts/ljud.gd")
 const UI := preload("res://scripts/ui.gd")
 const Gubbe := preload("res://scripts/gubbe.gd")
+const Stol := preload("res://scripts/stol.gd")
 const Server := preload("res://scripts/server.gd")
 const Klient := preload("res://scripts/klient.gd")
 const Fjarrmotor := preload("res://scripts/fjarrmotor.gd")
@@ -52,6 +53,8 @@ var hogar: Array = []
 var vis_poang: Array = []
 var vis_givare := 0
 var gubbar: Array = []  # figur per plats (ingen framför kameran)
+var stolar: Array = []  # stolen under varje figur (Theo 2026-11-13)
+var bord: Bord
 var kastsparr := 0.0
 var hover_gubbe := -1
 var bytes_info: Array = []
@@ -99,13 +102,14 @@ func _ready() -> void:
 			rng.seed = fro
 		elif a.begins_with("--fart="):
 			fart_tvingad = float(a.substr(7))
-	var bord := Bord.new()
+	bord = Bord.new()
 	add_child(bord)
 	kam = Camera3D.new()
 	kam.fov = 40.0
 	kam.near = 0.1
 	kam.far = 120.0
 	add_child(kam)
+	_vinjett()
 	# mjukt ljus för handen man håller (den ligger utanför lampans kägla)
 	var handljus := OmniLight3D.new()
 	handljus.position = Vector3(0.0, 0.4, -3.4)
@@ -322,6 +326,50 @@ func _kamera_till(s: int, tid := 1.1) -> void:
 	kam_tw.tween_property(self, "kam_vinkel", mal, tid).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
+## Inzoomning vid Chicago (Theo 2026-11-13, från snyggare-3d): bara när någon ropar eller klarar Chicago,
+## inte vid kast, hälsningar eller 6-7. Kameran glider en bit mot den spelaren och tillbaka. Den egna handen
+## följer med kameran, så kortens storlek och plats på skärmen är desamma som annars.
+var kam_zoom := 0.0
+var zoom_mal := Vector3.ZERO
+var zoom_tw: Tween
+const ZOOM_ANDEL := 0.42  # hur långt mot målet kameran glider (0–1)
+
+
+func _zooma_chicago(p: int, hall := 1.4) -> void:
+	if kam == null or meny_lage:
+		return
+	if p == betraktare:
+		zoom_mal = chicago_etikett.position  # egen: mot skylten mitt framför
+	else:
+		zoom_mal = _sittplats(p) + Vector3.DOWN * 0.3
+	if zoom_tw and zoom_tw.is_valid():
+		zoom_tw.kill()
+	zoom_tw = create_tween()
+	zoom_tw.tween_property(self, "kam_zoom", 1.0, 0.7).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	zoom_tw.tween_interval(hall)
+	zoom_tw.tween_property(self, "kam_zoom", 0.0, 0.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# handen exakt tillbaka där den hör hemma när zoomen är slut
+	zoom_tw.tween_callback(func() -> void: _layout_sats(betraktare, 0.1))
+
+
+func _zooma_kamera() -> void:
+	var bas := kam.transform
+	var andel := ZOOM_ANDEL * (0.6 if zoom_mal.distance_to(bas.origin) < 10.0 else 1.0)
+	var pos := bas.origin.lerp(zoom_mal, andel)
+	var nara := Transform3D(Basis(), pos).looking_at(zoom_mal, Vector3.UP)
+	kam.transform = bas.interpolate_with(nara, kam_zoom)
+	# handen: samma läge relativt kameran som utan zoom
+	if betraktare < 0 or betraktare >= vhand.size() or not _halls(betraktare):
+		return
+	var flytt := kam.transform * bas.affine_inverse()
+	var h: Array = vhand[betraktare]
+	for k in h.size():
+		var c: int = h[k]
+		if kort[c].i_rorelse():
+			continue
+		kort[c].transform = flytt * _hallen_tf(k, h.size(), c in valda, c == hover_id)
+
+
 func _halls(p: int) -> bool:
 	return p == betraktare and not meny_lage and visad
 
@@ -462,6 +510,11 @@ func _process(dt: float) -> void:
 	if meny_lage:
 		kam_vinkel += dt * 0.05
 	kam.transform = _kam_tf(kam_vinkel)
+	# CHICAGO-trycket på filten läses rättvänt från den egna platsen
+	if bord.logga_filt:
+		bord.logga_filt.rotation.y = kam_vinkel
+	if kam_zoom > 0.0:
+		_zooma_kamera()
 	kastsparr = maxf(kastsparr - dt, 0.0)
 	_hover_gubbar()
 	_hover_kort(get_viewport().get_mouse_position())
@@ -622,6 +675,11 @@ func _satt_upp_bord() -> void:
 		g.scale = Vector3.ONE * GUBBSKALA
 		g.titta_pa(Vector3.ZERO)
 		gubbar.append(g)
+		var st := Stol.new()
+		var d := _d(i)
+		st.transform = Transform3D(Basis(Vector3.UP, atan2(d.x, d.z)), d * R_GUBBE)
+		add_child(st)
+		stolar.append(st)
 	ui.visa_hud(spelare, regler.malpoang)
 	ui.satt_sexsju_text(Figurer.sexsju_text(int(spelare[betraktare].get("figur", 0))) if betraktare < spelare.size() else "6-7")
 	_tavla()
@@ -797,6 +855,8 @@ func _uppdatera_etiketter() -> void:
 		l.visible = i != betraktare and not meny_lage
 	for i in gubbar.size():
 		gubbar[i].visible = i != betraktare and not meny_lage
+	for i in stolar.size():
+		stolar[i].visible = i != betraktare and not meny_lage
 
 
 func _visa_tur(p: int) -> void:
@@ -814,6 +874,31 @@ func _visa_tur(p: int) -> void:
 		else:
 			gubbar[i].titta_pa(_sittplats(p))
 	_tavla()
+
+
+## Mjuk vinjett och lite filmkorn under gränssnittet (CanvasLayer under UI, båda renderarna; snyggare-3d).
+func _vinjett() -> void:
+	var lager := CanvasLayer.new()
+	lager.layer = -1
+	var r := ColorRect.new()
+	r.set_anchors_preset(Control.PRESET_FULL_RECT)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sh := Shader.new()
+	sh.code = """
+shader_type canvas_item;
+void fragment() {
+	vec2 d = UV - 0.5;
+	d.x *= 1.4;
+	float v = smoothstep(0.45, 0.95, length(d));
+	float korn = fract(sin(dot(UV * 1000.0 + TIME, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+	COLOR = vec4(vec3(0.0), v * 0.4 + korn * 0.02);
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	r.material = m
+	lager.add_child(r)
+	add_child(lager)
 
 
 ## Ungefär där en spelares huvud är (kameran för den som tittar).
@@ -847,6 +932,9 @@ func _rensa_gubbar() -> void:
 	for g in gubbar:
 		g.queue_free()
 	gubbar.clear()
+	for st in stolar:
+		st.queue_free()
+	stolar.clear()
 	hover_gubbe = -1
 
 
@@ -1060,7 +1148,6 @@ func _egen_sexsju() -> void:
 ## Skratta (Lukas): klicka på figuren och välj Skratta. Han skrattar, bankar i bordet i takt med smällarna i
 ## ljudet, och alla vid bordet hör det (Theo 2026-11-12).
 var skratt_spelare: AudioStreamPlayer
-const SKRATT_FORE := 0.25
 
 
 func _skratt(p: int) -> void:
@@ -1083,6 +1170,9 @@ func _skratt(p: int) -> void:
 	else:
 		skratt_spelare.play()
 		ui.visa_banner("Haha!", spelare[p].namn + " skrattar", UI.KRAM, 1.6)
+
+
+const SKRATT_FORE := 0.25
 
 
 func _sexsju(p: int) -> void:
@@ -1571,6 +1661,7 @@ func _handelse(e: Dictionary, id: int) -> void:
 			if _halls(p):
 				chicago_etikett.position = _d(p) * 3.0 + Vector3.UP * 1.6
 			chicago_etikett.visible = true
+			_zooma_chicago(p)
 			ljud.spela("chicago", 1.0, 0.0, 0.0)
 			ui.visa_banner("CHICAGO!", "%s ska ta alla fem stick" % spelare[p].namn, UI.GULD, 1.8)
 			ui.logga("%s ropar Chicago!" % spelare[p].namn, UI.GULD)
@@ -1805,6 +1896,7 @@ func _poang_anim(e: Dictionary, id: int) -> void:
 			await _vanta(1.8)
 		"chicago":
 			ljud.spela("vinst", 1.0, 0.0, 0.0)
+			_zooma_chicago(p)
 			ui.visa_banner("Chicago!", "%s tog alla fem stick · +%d poäng" % [namn, pts], UI.GULD, 1.8)
 			ui.logga("%s klarade Chicago: +%d." % [namn, pts], UI.GULD)
 			brickor[p] = "Chicago tagen"
