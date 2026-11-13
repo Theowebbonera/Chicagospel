@@ -8,6 +8,8 @@ const GOLV_Y := -7.8
 const TAK_Y := 16.0
 const PANEL_TOPP := -3.4  # boaseringens överkant
 const SEKTIONER := 12
+## Webben (Compatibility) får inget allmänt ljus på rummet: väggen lyser svagt själv där.
+const SJALVLJUS_WEBB := 1.0
 
 var ljus: Array[OmniLight3D] = []
 
@@ -40,6 +42,28 @@ func _mesh(m: Mesh, mat: Material, tf: Transform3D, skugga := false) -> MeshInst
 	return mi
 
 
+## En bit av väggen mellan vinklarna a0 och a1 (samma vinklar som _vid_vagg), normalen inåt.
+func _vaggbit(a0: float, a1: float) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var delar := 8
+	for k in delar:
+		var x0 := lerpf(a0, a1, float(k) / delar)
+		var x1 := lerpf(a0, a1, float(k + 1) / delar)
+		var p0 := Vector3(sin(x0) * VAGG_RADIE, 0, cos(x0) * VAGG_RADIE)
+		var p1 := Vector3(sin(x1) * VAGG_RADIE, 0, cos(x1) * VAGG_RADIE)
+		var n0 := -p0.normalized()
+		var n1 := -p1.normalized()
+		var lo := Vector3.UP * GOLV_Y
+		var hi := Vector3.UP * TAK_Y
+		for v in [[p0 + lo, n0], [p1 + lo, n1], [p1 + hi, n1], [p0 + lo, n0], [p1 + hi, n1], [p0 + hi, n0]]:
+			st.set_normal(v[1])
+			st.set_uv(Vector2(0, 0))
+			st.add_vertex(v[0])
+	st.generate_tangents()
+	return st.commit()
+
+
 ## Punkt på väggen vid vinkel a (sett från bordets mitt), en bit in från väggen.
 func _vid_vagg(a: float, y: float, in_fran_vagg := 0.0) -> Transform3D:
 	var r := VAGG_RADIE - in_fran_vagg
@@ -62,6 +86,7 @@ shader_type spatial;
 render_mode cull_disabled;
 uniform float panel_topp;
 uniform float golv;
+uniform float sjalvljus = 0.0;  // bara i Compatibility (webben), som saknar rummets allmänna ljus
 uniform sampler2D brus : filter_linear_mipmap, repeat_enable;
 varying vec3 vp;
 void vertex() { vp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
@@ -102,6 +127,7 @@ void fragment() {
 	// sotigare upptill
 	c *= mix(1.0, 0.55, smoothstep(6.0, 15.0, y));
 	ALBEDO = c * 1.35;
+	EMISSION = c * sjalvljus;
 	ROUGHNESS = rough;
 	NORMAL_MAP = nrm;
 }
@@ -110,8 +136,12 @@ void fragment() {
 	m.shader = sh
 	m.set_shader_parameter("panel_topp", PANEL_TOPP)
 	m.set_shader_parameter("golv", GOLV_Y)
+	m.set_shader_parameter("sjalvljus", SJALVLJUS_WEBB if ar_compat() else 0.0)
 	m.set_shader_parameter("brus", _brus(0.06, 4, 256))
-	_mesh(c, m, Transform3D(Basis(), Vector3(0, (TAK_Y + GOLV_Y) * 0.5, 0)))
+	# En bit per sektion i stället för en hel cylinder: Compatibility (webben) tar bara med ett
+	# fåtal lampor per yta, så en enda vägg runt hela rummet blev svart där (Theo 2026-11-13).
+	for i in SEKTIONER:
+		_mesh(_vaggbit(TAU * float(i) / SEKTIONER, TAU * float(i + 1) / SEKTIONER), m, Transform3D())
 	# tak: mörkt, med kassetter som knappt syns
 	var tak := CylinderMesh.new()
 	tak.top_radius = VAGG_RADIE
@@ -216,7 +246,7 @@ func _vagglampa(a: float) -> void:
 	var o := OmniLight3D.new()
 	o.transform = bas * Transform3D(Basis(), Vector3(0, 0.6, -0.9))
 	o.light_color = Color(1.0, 0.72, 0.45)
-	o.light_energy = 2.2
+	o.light_energy = 2.2 * (2.5 if ar_compat() else 1.0)
 	o.omni_range = 7.0
 	o.omni_attenuation = 1.4
 	o.shadow_enabled = false
