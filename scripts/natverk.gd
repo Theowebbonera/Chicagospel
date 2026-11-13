@@ -138,5 +138,12 @@ static func tillstand(m, p: int) -> Dictionary:
 		"lek": m.lek.size(),
 		"slang": m.slangda.size() + (1 if m.upp_slangt >= 0 else 0),
 		"upp": m.upp_kort,
+		# Plump (Theo 2026-11-13): buden är offentliga, liksom antal kort och tagna stick
+		"spel": "plump" if "bud" in m else "chicago",
+		"bud": m.bud.duplicate() if "bud" in m else [],
+		"kort_i_giv": m.kort_i_giv if "kort_i_giv" in m else 5,
+		"stick_vunna": m.stick_vunna.duplicate() if "stick_vunna" in m else [],
+		"plumpar": m.plumpar.duplicate() if "plumpar" in m else [],
+		"rundor": m.rundor.duplicate() if "rundor" in m else [],
 		"egen": vy,
 	}

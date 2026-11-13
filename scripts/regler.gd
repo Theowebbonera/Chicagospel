@@ -7,6 +7,11 @@ const SPARFIL := "user://chicago.cfg"
 const VERSION := 3
 
 # --- partiet
+## Vilket spel bordet spelar (Theo 2026-11-13): 0 Chicago, 1 Plump. Plumps inställningar står i PLUMP_LISTA.
+var spel := 0
+var plump_max := 10  # kort i första given (begränsas av leken: högst 52 / antal spelare)
+var plump_upp := true  # efter given med 1 kort går det upp igen till max
+
 var malpoang := 52
 # --- poängtabell för pokerhänder
 var p_par := 1
@@ -101,8 +106,23 @@ func kat_poang(kat: int) -> int:
 	return int(get(["", "p_par", "p_tva_par", "p_triss", "p_stege", "p_farg", "p_kak", "p_fyrtal", "p_fargstege", "p_royal"][kat]))
 
 
+const SPEL_NAMN := ["Chicago", "Plump"]
+const PLUMP_LISTA := [
+	{"grupp": "Plump"},
+	{"namn": "plump_max", "text": "Kort i första given", "typ": "tal", "min": 1, "max": 10, "hjalp": "Sedan ett kort färre per giv ner till 1. Med många spelare börjar det lägre om leken inte räcker (52 kort delat på antalet spelare)."},
+	{"namn": "plump_upp", "text": "Upp igen efter 1 kort", "typ": "bool", "hjalp": "På: efter given med 1 kort går det upp igen till första givens antal. Av: partiet slutar efter given med 1 kort."},
+]
+
+
+func ar_plump() -> bool:
+	return spel == 1
+
+
 func namnlista() -> Array:
-	var ut: Array = []
+	var ut: Array = ["spel"]
+	for d in PLUMP_LISTA:
+		if d.has("namn"):
+			ut.append(d.namn)
 	for d in LISTA:
 		if d.has("namn"):
 			ut.append(d.namn)
@@ -180,6 +200,8 @@ func ladda(cf: ConfigFile) -> void:
 
 ## En rad med de viktigaste reglerna, för den som går med i ett bord (läsläge).
 func kort_sammanfattning() -> String:
+	if ar_plump():
+		return "Plump · %d kort ner till 1%s · exakt bud ger 10 + budet" % [plump_max, " och upp igen" if plump_upp else ""]
 	var d: Array = ["Mål %d%s" % [malpoang, " med Chicago" if chicago_kravs_for_vinst else ""]]
 	if kopstopp_pa:
 		d.append("Köpstopp %d" % kopstopp)
@@ -194,6 +216,8 @@ func kort_sammanfattning() -> String:
 
 ## Kort sammanfattning av reglerna som de är inställda, för regelsidan i spelet.
 func beskrivning() -> String:
+	if ar_plump():
+		return plump_beskrivning()
 	var t := ""
 	t += "[b]Mål:[/b] först till %d poäng%s. Bara poäng, inga insatser. Når flera målet samtidigt vinner den med högst total, vid lika den som är först i tur efter given.\n\n" % [malpoang, ", och man måste ha tagit Chicago någon gång i partiet för att vinna" if chicago_kravs_for_vinst else ""]
 	t += "[b]Given:[/b] alla får 5 kort. Spelaren efter given börjar och turen går medsols.\n\n"
@@ -239,4 +263,29 @@ func beskrivning() -> String:
 		t += " " + ("Given avbryts direkt om ropet spricker." if chicago_avbryt else "Sticken spelas klart även om ropet spricker.")
 	else:
 		t += "[b]Chicago:[/b] får inte ropas."
+	return t
+
+
+## Plumps regler som de är inställda, för regelsidan (Theo 2026-11-13, spelregler.org/plump-regler).
+func plump_beskrivning() -> String:
+	var t := ""
+	t += "[b]Mål:[/b] flest poäng när sista given är spelad. Bara poäng, inga insatser.
+
+"
+	t += "[b]Givarna:[/b] första given har %d kort per spelare (färre om leken inte räcker), sedan ett kort färre för varje giv ner till 1%s. Given går medsols.
+
+" % [plump_max, ", och sedan upp igen" if plump_upp else ""]
+	t += "[b]Bud:[/b] alla ser sina kort. Spelaren efter given bjuder först hur många stick den ska ta, 0 till antalet kort, och turen går medsols. Givaren bjuder sist och får inte bjuda så att buden tillsammans blir lika många som sticken: någon måste missa.
+
+"
+	t += "[b]Sticken:[/b] spelaren efter given spelar ut först. Man måste bekänna färg om man kan, annars får man lägga vilket kort som helst. Det finns ingen trumf: högsta kortet i utspelad färg tar sticket, och den som tar sticket spelar ut nästa.
+
+"
+	t += "[b]Poäng:[/b] den som tar exakt så många stick som den bjöd får 10 + budet, alltså 10 för noll stick, 13 för tre. Den som tar för många eller för få får en plump och inga poäng den given.
+
+"
+	t += "[b]1 kort:[/b] man ser sitt kort och bjuder sedan, som i de andra givarna.
+
+"
+	t += "[b]Lika:[/b] har flera lika många poäng vinner den med minst plumpar."
 	return t

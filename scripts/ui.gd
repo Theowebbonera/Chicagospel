@@ -72,6 +72,11 @@ var atgard_panel: PanelContainer
 var atgard_info: Label
 var atgard_hand: Label
 var atgard_knappar: HBoxContainer
+# Skapa bord: Chicago eller Plump (Theo 2026-11-13)
+var spel_knappar: Array = []
+var regel_rubrik: Label
+var chicago_noder: Array = []
+var plump_noder: Array = []
 var logg: VBoxContainer
 var regel_text: RichTextLabel
 var slut_titel: Label
@@ -329,7 +334,7 @@ func _bygg_huvudmeny() -> void:
 	titel.add_theme_constant_override("shadow_outline_size", 18)
 	titel.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	v.add_child(titel)
-	var under := _lbl("Svensk poker med stick · spela online med dina vänner", 22 if mobil else 26, false, Color(0.9, 0.86, 0.76))
+	var under := _lbl("Chicago eller Plump · spela online med dina vänner", 22 if mobil else 26, false, Color(0.9, 0.86, 0.76))
 	v.add_child(under)
 	meny_meddelande = _lbl("", 22 if mobil else 24, true, Color(1.0, 0.62, 0.5))
 	meny_meddelande.visible = false
@@ -382,6 +387,17 @@ func _bygg_installningar() -> void:
 	vv.custom_minimum_size = Vector2(560, 0)
 	vv.add_theme_constant_override("separation", 10)
 	h.add_child(vv)
+	vv.add_child(_rubrik("Spel"))
+	var spel_rad := HBoxContainer.new()
+	spel_rad.add_theme_constant_override("separation", 10)
+	for i in Regler.SPEL_NAMN.size():
+		var nr: int = i
+		var sk := _knapp(Regler.SPEL_NAMN[i], func() -> void: _valj_spel(nr), 24)
+		sk.toggle_mode = true
+		sk.custom_minimum_size = Vector2(170, 48)
+		spel_rad.add_child(sk)
+		spel_knappar.append(sk)
+	vv.add_child(spel_rad)
 	vv.add_child(_rubrik("Du"))
 	var ah := HBoxContainer.new()
 	# antalet bestäms av hur många som går med (2–6); raden finns kvar för sparade inställningar
@@ -458,11 +474,16 @@ func _bygg_installningar() -> void:
 	lista.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lista.add_theme_constant_override("separation", 6)
 	scroll.add_child(lista)
-	for d in Regler.LISTA:
+	for d in Regler.LISTA + Regler.PLUMP_LISTA:
+		var ar_plump: bool = d in Regler.PLUMP_LISTA
+		var noder: Array = plump_noder if ar_plump else chicago_noder
 		if d.has("grupp"):
-			lista.add_child(_rubrik(d.grupp))
+			var rb := _rubrik(d.grupp)
+			lista.add_child(rb)
+			noder.append(rb)
 			continue
 		var rad := HBoxContainer.new()
+		noder.append(rad)
 		var l := _lbl(d.text)
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		rad.add_child(l)
@@ -493,16 +514,23 @@ func _bygg_installningar() -> void:
 			hj.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			hj.custom_minimum_size = Vector2(600, 0)
 			lista.add_child(hj)
+			noder.append(hj)
 	# knappar
 	var kh := HBoxContainer.new()
 	kh.add_theme_constant_override("separation", 12)
 	v.add_child(kh)
-	kh.add_child(_knapp("Husregler (standard)", func() -> void:
+	var husknapp := _knapp("Husregler (standard)", func() -> void:
+		var spel: int = arb_regler.spel
 		arb_regler.aterstall()
-		_uppdatera_kontroller()))
-	kh.add_child(_knapp("Klassiska regler", func() -> void:
+		arb_regler.spel = spel
+		_uppdatera_kontroller())
+	kh.add_child(husknapp)
+	chicago_noder.append(husknapp)
+	var klassisk := _knapp("Klassiska regler", func() -> void:
 		arb_regler.klassiska()
-		_uppdatera_kontroller()))
+		_uppdatera_kontroller())
+	kh.add_child(klassisk)
+	chicago_noder.append(klassisk)
 	kh.add_child(_knapp("Läs reglerna", func() -> void: visa_regler(arb_regler)))
 	var mel := Control.new()
 	mel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -529,7 +557,25 @@ func _visa_rader() -> void:
 		spelar_rader[i].rad.visible = i == 0
 
 
+## Chicago eller Plump: inställningarna för det valda spelet visas.
+func _valj_spel(nr: int) -> void:
+	arb_regler.spel = nr
+	_uppdatera_kontroller()
+
+
 func _uppdatera_kontroller() -> void:
+	var plump: bool = arb_regler.ar_plump()
+	for i in spel_knappar.size():
+		(spel_knappar[i] as Button).set_pressed_no_signal(i == arb_regler.spel)
+		var fc: Color = GULD if i == arb_regler.spel else KRAM
+		for nyckel in ["font_color", "font_pressed_color", "font_hover_pressed_color", "font_hover_color"]:
+			(spel_knappar[i] as Button).add_theme_color_override(nyckel, fc)
+	for nod in chicago_noder:
+		nod.visible = not plump
+	for nod in plump_noder:
+		nod.visible = plump
+	if inst_titel:
+		inst_titel.text = "Skapa bord · %s" % Regler.SPEL_NAMN[arb_regler.spel]
 	for k in regel_kontroller:
 		var c: Control = regel_kontroller[k]
 		var val = arb_regler.get(k)
@@ -589,7 +635,8 @@ func _bygg_regelvy() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	p.add_child(v)
-	v.add_child(_lbl("Så spelar man Chicago", 40, true, GULD))
+	regel_rubrik = _lbl("Så spelar man Chicago", 40, true, GULD)
+	v.add_child(regel_rubrik)
 	regel_text = RichTextLabel.new()
 	regel_text.bbcode_enabled = true
 	regel_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -604,6 +651,12 @@ func _bygg_regelvy() -> void:
 func visa_regler(r) -> void:
 	if r == null:
 		r = arb_regler
+	regel_rubrik.text = "Så spelar man %s" % Regler.SPEL_NAMN[r.spel]
+	if r.ar_plump():
+		regel_text.text = r.beskrivning() + "\n\n[b]Styrning:[/b] när det är din tur att bjuda väljer du budet bland knapparna. I sticken klickar du på kortet du vill spela, otillåtna kort är mörkare."
+		regelvy.visible = true
+		regelvy.move_to_front()
+		return
 	var t: String = r.beskrivning()
 	t += "\n\n[b]Pokerhänderna, från sämst till bäst:[/b] par · två par · triss (tre lika) · stege (fem i följd) · färg (fem i samma färg) · kåk (triss + par) · fyrtal · färgstege · royal straight flush (tio till ess i samma färg). Vid samma sorts hand avgör högsta valören, sedan nästa och så vidare."
 	t += "\n\n[b]Styrning:[/b] klicka på kort för att välja vilka som ska bytas och tryck Byt. I sticken klickar du på kortet du vill spela, otillåtna kort är mörkare. Tangenterna 1–5 väljer kort, Enter bekräftar och Esc pausar."
@@ -870,7 +923,7 @@ func dolj_banner() -> void:
 	bc.modulate.a = 0.0
 
 
-func visa_hud(spelare: Array, malpoang: int) -> void:
+func visa_hud(spelare: Array, malpoang: int, rubrik := "") -> void:
 	_gomt_allt()
 	dolj_banner()
 	hud.visible = true
@@ -881,7 +934,7 @@ func visa_hud(spelare: Array, malpoang: int) -> void:
 	for c in logg.get_children():
 		c.queue_free()
 	var tv: VBoxContainer = hud.find_child("Tavla", true, false)
-	tavla_rubrik.text = "Poäng · först till %d" % malpoang
+	tavla_rubrik.text = rubrik if rubrik != "" else "Poäng · först till %d" % malpoang
 	for i in spelare.size():
 		var s: Dictionary = spelare[i]
 		var p := PanelContainer.new()
@@ -1000,13 +1053,26 @@ func visa_atgard(info: String, hand: String, knappar: Array) -> void:
 	atgard_hand.visible = hand != ""
 	for c in atgard_knappar.get_children():
 		c.queue_free()
+	# Många knappar (Plumps bud 0–10) läggs i rader om sex, så att rutan inte blir bredare än vanligt.
+	var smala := knappar.size() > 4
+	var behallare: Container = atgard_knappar
+	if smala:
+		var g := GridContainer.new()
+		g.columns = 6
+		g.add_theme_constant_override("h_separation", 6)
+		g.add_theme_constant_override("v_separation", 6)
+		g.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		atgard_knappar.add_child(g)
+		behallare = g
 	for k in knappar:
 		var data = k[1]
-		var b := _knapp(k[0], func() -> void: atgard.emit(data), 22)
+		var b := _knapp(k[0], func() -> void: atgard.emit(data), 20 if smala else 22)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if smala:
+			b.custom_minimum_size = Vector2(56, 44)
 		if k.size() > 2 and k[2]:
 			b.add_theme_color_override("font_color", GULD)
-		atgard_knappar.add_child(b)
+		behallare.add_child(b)
 	atgard_panel.visible = true
 
 
@@ -1299,7 +1365,8 @@ func visa_lobby(d: Dictionary, min_plats: int, lank: String) -> void:
 	lobby_vy.visible = true
 	lobby_lank = lank
 	var varde: bool = int(d.varde) == min_plats
-	lobby_titel.text = "Bord %s" % d.kod
+	var spel_nr: int = int(d.get("regler", {}).get("spel", 0))
+	lobby_titel.text = "Bord %s · %s" % [d.kod, Regler.SPEL_NAMN[clampi(spel_nr, 0, 1)]]
 	var med := 0
 	for x in d.platser:
 		if x.typ != "tom":

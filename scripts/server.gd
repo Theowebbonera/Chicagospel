@@ -6,6 +6,7 @@ extends Node
 ## Protokoll: JSON-text över WebSocket. Allt från klienter valideras.
 
 const Motor := preload("res://scripts/motor.gd")
+const Plump := preload("res://scripts/plump.gd")
 const Regler := preload("res://scripts/regler.gd")
 const Natverk := preload("res://scripts/natverk.gd")
 const Figurer := preload("res://scripts/figurer.gd")
@@ -114,8 +115,10 @@ func _ta_emot(id: int, text: String) -> void:
 					if d.get("regler") is Dictionary:
 						b.regler.fran_dict(d.regler)
 						b.regler.malpoang = clampi(b.regler.malpoang, 5, 500)
+						b.regler.spel = clampi(b.regler.spel, 0, 1)
+						b.regler.plump_max = clampi(b.regler.plump_max, 1, 10)
 					_skicka_lobby(b)
-				"byt", "upp", "chicago", "spela":
+				"byt", "upp", "chicago", "spela", "bud":
 					_drag(id, b, p, d)
 				"kasta":
 					_kasta(id, b, p, d)
@@ -156,6 +159,8 @@ func _skapa(id: int, d: Dictionary) -> void:
 	if d.get("regler") is Dictionary:
 		r.fran_dict(d.regler)
 	r.malpoang = clampi(r.malpoang, 5, 500)
+	r.spel = clampi(r.spel, 0, 1)
+	r.plump_max = clampi(r.plump_max, 1, 10)
 	var kod := _ny_kod()
 	var platser: Array = []
 	for i in antal:
@@ -291,7 +296,8 @@ func _starta_parti(id: int, b: Dictionary, p: int) -> void:
 	var fig := Figurer.fordela(valda, rng)
 	for q in b.platser.size():
 		b.platser[q].figur = fig[q]
-	var m := Motor.new()
+	# Bordet spelar Chicago eller Plump (Theo 2026-11-13); motorerna har samma gränssnitt.
+	var m = Plump.new() if b.regler.ar_plump() else Motor.new()
 	m.starta(namn, b.regler.kopia(), rng.randi() % 1000000)
 	b.motor = m
 	b.startad = true
@@ -351,6 +357,12 @@ func _sanda_steg(b: Dictionary) -> void:
 				b.tagna.append([e.vinnare, e.stick.map(func(x): return x[1])])
 			"vinst":
 				paus += 3.0
+			"bud_start":
+				paus += 0.3
+			"bud":
+				paus += 0.9
+			"plump_resultat":
+				paus += 3.2
 			"giv_slut":
 				paus += 1.2
 	b.vanta = maxf(b.vanta, paus * tempo)
@@ -379,6 +391,8 @@ func _drag(id: int, b: Dictionary, p: int, d: Dictionary) -> void:
 			ok = m.fas == Motor.Fas.CHICAGO and m.ropa_chicago(p, bool(d.get("ja", false)))
 		"spela":
 			ok = m.fas == Motor.Fas.STICK and m.spela(p, int(d.get("kort", -1)))
+		"bud":
+			ok = m.fas == Motor.Fas.BUD and m.bjud(p, int(d.get("bud", -1)))
 	if not ok:
 		_fel(id, "Otillåtet drag")
 		return
@@ -476,7 +490,7 @@ func _tick(b: Dictionary, dt: float) -> void:
 		m.ny_giv()
 		_sanda_steg(b)
 		return
-	if m.fas != Motor.Fas.BYTE and m.fas != Motor.Fas.CHICAGO and m.fas != Motor.Fas.STICK:
+	if m.fas != Motor.Fas.BYTE and m.fas != Motor.Fas.CHICAGO and m.fas != Motor.Fas.STICK and m.fas != Motor.Fas.BUD:
 		return
 	# Är den som har turen frånkopplad länge gör servern ett enkelt drag, så att partiet inte står still:
 	# inget byte (vid 1 upp tar den kortet), ingen Chicago, och det lägsta tillåtna kortet i sticket. Ingen robot, ingen taktik.
@@ -493,6 +507,8 @@ func _tick(b: Dictionary, dt: float) -> void:
 				m.byt(p, [])
 		Motor.Fas.CHICAGO:
 			m.ropa_chicago(p, false)
+		Motor.Fas.BUD:
+			m.bjud(p, m.tillatna_bud(p)[0])
 		Motor.Fas.STICK:
 			var till: Array = m.tillatna(p)
 			till.sort_custom(func(a: int, c: int) -> bool: return a % 13 < c % 13)

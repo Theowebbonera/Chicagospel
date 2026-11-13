@@ -24,6 +24,12 @@ var poang: Array = []
 var vinnare := -1
 var chicago_tagen: Array = []
 var upp_kort := -1  # 1 upp: uppvänt kort som väntar på svar
+# Plump (Theo 2026-11-13)
+var bud: Array = []
+var kort_i_giv := 5
+var stick_vunna: Array = []
+var plumpar: Array = []
+var rundor: Array = []
 var egen := {}  # spelarens egen vy från servern
 var ko: Array = []  # steg som inte spelats upp än
 var skickat := false  # ett drag är skickat och väntar på svar
@@ -52,6 +58,11 @@ func tillampa(s: Dictionary) -> void:
 	vinnare = s.vinnare
 	chicago_tagen = s.get("chicago_tagen", [])
 	upp_kort = int(s.get("upp", -1))
+	bud = s.get("bud", [])
+	kort_i_giv = int(s.get("kort_i_giv", 5))
+	stick_vunna = s.get("stick_vunna", [])
+	plumpar = s.get("plumpar", [])
+	rundor = s.get("rundor", [])
 	egen = s.egen
 	skickat = false
 
@@ -66,7 +77,7 @@ func ta_handelser() -> Array:
 
 
 func min_tur() -> bool:
-	return not skickat and ko.is_empty() and tur == jag and (fas == Motor.Fas.BYTE or fas == Motor.Fas.CHICAGO or fas == Motor.Fas.STICK)
+	return not skickat and ko.is_empty() and tur == jag and (fas == Motor.Fas.BYTE or fas == Motor.Fas.CHICAGO or fas == Motor.Fas.STICK or fas == Motor.Fas.BUD)
 
 
 func vy(p: int) -> Dictionary:
@@ -106,6 +117,16 @@ func ta_upp(_p: int, ja: bool) -> bool:
 func ropa_chicago(_p: int, ja: bool) -> bool:
 	skickat = true
 	klient.skicka({"t": "chicago", "ja": ja})
+	return true
+
+
+func tillatna_bud(_p: int) -> Array:
+	return egen.get("tillatna_bud", [])
+
+
+func bjud(_p: int, b: int) -> bool:
+	skickat = true
+	klient.skicka({"t": "bud", "bud": b})
 	return true
 
 

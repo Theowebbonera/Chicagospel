@@ -10,7 +10,7 @@ extends RefCounted
 const K := preload("res://scripts/kort.gd")
 const H := preload("res://scripts/handvarde.gd")
 
-enum Fas {INTE_STARTAD, BYTE, CHICAGO, STICK, GIV_SLUT, SLUT}
+enum Fas {INTE_STARTAD, BYTE, CHICAGO, STICK, GIV_SLUT, SLUT, BUD}  # BUD används bara av Plump (plump.gd)
 
 var regler
 var namn: Array = []

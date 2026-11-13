@@ -1,5 +1,6 @@
 extends SceneTree
-## Kör: Godot --headless --path . --script res://tests/test_online_scen.gd
+## Kör: Godot --headless --path . --script res://tests/test_online_scen.gd [-- --plump]
+## Med --plump spelas Plump (Theo 2026-11-13) i stället för Chicago, med 4 kort ner till 1 och upp igen.
 ## Hela spelet (main.tscn med 3D-bordet) som onlineklient mot en lokal server:
 ## Anna (en enkel klient) skapar ett bord. Theo går med som via en delad länk: figurskärmen med Gå med, sedan
 ## lobbyn ("Väntar på att Anna startar"). Anna startar med de två som sitter vid bordet (inga robotar).
@@ -71,7 +72,14 @@ class Gast extends Node:
 			Motor.Fas.CHICAGO:
 				k.skicka({"t": "chicago", "ja": Robot.valj_chicago(vy, Robot.MEDEL, rng)})
 			Motor.Fas.STICK:
-				k.skicka({"t": "spela", "kort": Robot.valj_kort(vy, Robot.MEDEL, rng)})
+				if regler_d.get("spel", 0) == 1:
+					var t: Array = vy.tillatna
+					k.skicka({"t": "spela", "kort": t[rng.randi() % t.size()]})
+				else:
+					k.skicka({"t": "spela", "kort": Robot.valj_kort(vy, Robot.MEDEL, rng)})
+			Motor.Fas.BUD:
+				var t: Array = vy.tillatna_bud
+				k.skicka({"t": "bud", "bud": t[rng.randi() % t.size()]})
 			_:
 				return
 		skickat = true
@@ -102,6 +110,11 @@ func _init() -> void:
 	main.fart_tvingad = 25.0
 	var r := Regler.new()
 	r.malpoang = 20
+	var plump := "--plump" in OS.get_cmdline_user_args()
+	if plump:
+		r.spel = 1
+		r.plump_max = 4
+	print("spel: ", "Plump" if plump else "Chicago")
 	var gast := Gast.new()
 	root.add_child(gast)
 	gast.k.anslut("ws://127.0.0.1:%d" % PORT)
@@ -145,6 +158,9 @@ func _init() -> void:
 					main.beslut.emit(randf() < 0.5)
 				"chicago":
 					main.beslut.emit(false)
+				"bud":
+					var tb: Array = main.motor.tillatna_bud(main.min_plats)
+					main.beslut.emit(tb[randi() % tb.size()])
 				"spela":
 					if not main.tillatna.is_empty():
 						main.beslut.emit(main.tillatna[0])
@@ -189,7 +205,7 @@ func _init() -> void:
 		if m.fas == Motor.Fas.SLUT and not main.online_kor:
 			break
 	if m.fas != Motor.Fas.SLUT:
-		print("server: fas %d tur %d vanta %.2f platser %s intern %s" % [m.fas, m.tur, b.vanta, str(b.platser.map(func(x): return [x.typ, x.id])), str(m.intern)])
+		print("server: fas %d tur %d vanta %.2f platser %s" % [m.fas, m.tur, b.vanta, str(b.platser.map(func(x): return [x.typ, x.id]))])
 		print("klient: fas %d tur %d skickat %s ko %d inmatning '%s' vantar %s far_ropa %s kor %s" % [main.fjarr.fas, main.fjarr.tur, main.fjarr.skickat, main.fjarr.ko.size(), main.inmatning, main.vantar_pa_drag, main.fjarr.egen.get("far_ropa"), main.online_kor])
 		print("gast: plats %d tur %s fas %s skickat %s" % [gast.plats, gast.s.get("tur"), gast.s.get("fas"), gast.skickat])
 	_ok(m.fas == Motor.Fas.SLUT, "partiet spelas klart online (giv %d, fas %d)" % [m.giv_nr, m.fas])

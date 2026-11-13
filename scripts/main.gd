@@ -390,8 +390,9 @@ func _hallen_tf(k: int, m: int, vald: bool, hov: bool) -> Transform3D:
 	var fri_v := HAND_VANSTER * ui_skala
 	var fri_h := HAND_HOGER * ui_skala
 	var bredd_px := maxf(vp.x - fri_v - fri_h, vp.x * 0.45)
-	var behov := 5 * Kort3D.BREDD + 4 * HAND_GLIPA
-	var s := clampf(bredd_px * per_px / behov, 0.6, 1.0)
+	var antal := maxi(5, m)
+	var behov := antal * Kort3D.BREDD + (antal - 1) * HAND_GLIPA
+	var s := clampf(bredd_px * per_px / behov, 0.6 if antal <= 5 else 0.3, 1.0)
 	var mitt := (fri_v + (vp.x - fri_v - fri_h) * 0.5 - vp.x * 0.5) * per_px if vp.x - fri_v - fri_h >= vp.x * 0.45 else 0.0
 	var xc := (k - (m - 1) / 2.0) * (Kort3D.BREDD + HAND_GLIPA) * s
 	var x := mitt + xc
@@ -626,6 +627,8 @@ func _till_meny() -> void:
 	inmatning = ""
 	get_tree().paused = false
 	ui.dolj_atgard()
+	if bord.logga_filt:
+		bord.logga_filt.text = "CHICAGO"
 	_meny_dekor()
 	ui.visa_huvudmeny()
 
@@ -680,9 +683,33 @@ func _satt_upp_bord() -> void:
 		st.transform = Transform3D(Basis(Vector3.UP, atan2(d.x, d.z)), d * R_GUBBE)
 		add_child(st)
 		stolar.append(st)
-	ui.visa_hud(spelare, regler.malpoang)
+	# trycket på filten visar spelet som spelas (Theo 2026-11-13)
+	if bord.logga_filt:
+		bord.logga_filt.text = "PLUMP" if _ar_plump() else "CHICAGO"
+	if _ar_plump():
+		var rundor: Array = motor.rundor if motor != null and "rundor" in motor else []
+		ui.visa_hud(spelare, maxi(12 * rundor.size(), 50), "Poäng · Plump")
+	else:
+		ui.visa_hud(spelare, regler.malpoang)
 	ui.satt_sexsju_text(Figurer.sexsju_text(int(spelare[betraktare].get("figur", 0))) if betraktare < spelare.size() else "6-7")
 	_tavla()
+
+
+## Plump (Theo 2026-11-13): spelas på samma bord, med bud i stället för byten och Chicago.
+func _ar_plump() -> bool:
+	return regler != null and regler.ar_plump()
+
+
+func _antal_stick() -> int:
+	return int(motor.kort_i_giv) if _ar_plump() and motor != null else 5
+
+
+## Raden under namnet på poängtavlan: budet och hur många stick spelaren har tagit.
+func _plump_info(i: int) -> String:
+	if motor == null or not "bud" in motor or i >= motor.bud.size() or int(motor.bud[i]) < 0:
+		return ""
+	var tagna: int = hogar[i] if i < hogar.size() else 0
+	return "bud %d · %d stick" % [int(motor.bud[i]), tagna]
 
 
 func _tur(id: int) -> void:
@@ -716,6 +743,27 @@ func _tur_inre(id: int) -> void:
 			valda = []
 			hover_id = -1
 			motor.byt(p, sl)
+		Motor.Fas.BUD:
+			inmatning = "bud"
+			var t: Array = motor.tillatna_bud(p)
+			var k := _antal_stick()
+			var under := "Hur många stick tar du? Exakt rätt ger 10 + budet, annars en plump."
+			var forbjudet := -1
+			for b in k + 1:
+				if not b in t:
+					forbjudet = b
+			if forbjudet >= 0:
+				under += "\nDu ger och får inte bjuda %d: då går buden jämnt ut." % forbjudet
+			var knappar: Array = []
+			for b in t:
+				knappar.append([str(b), b, false])
+			ui.visa_atgard("Ditt bud · %d %s" % [k, "kort" if k != 1 else "kort"], under, knappar)
+			var b = await beslut
+			if id != korning:
+				return
+			inmatning = ""
+			ui.dolj_atgard()
+			motor.bjud(p, int(b))
 		Motor.Fas.CHICAGO:
 			inmatning = "chicago"
 			ui.visa_atgard("Vill du ropa Chicago?", "Du lovar att ta alla fem stick. Lyckas det får du %d poäng, annars dras %d poäng." % [regler.chicago_poang, regler.chicago_straff], [["Ropa Chicago!", true, true], ["Nej tack", false]])
@@ -729,12 +777,14 @@ func _tur_inre(id: int) -> void:
 			tillatna = motor.tillatna(p)
 			for c in vhand[p]:
 				kort[c].satt_dimmad(not c in tillatna)
-			var info := "Stick %d av 5 – din tur" % motor.stick_nr
+			var info := "Stick %d av %d – din tur" % [motor.stick_nr, _antal_stick()]
 			var under := "Spela ut valfritt kort." if motor.stick.is_empty() else "Spelat: %s." % K.namn(motor.stick[0][1])
 			if not motor.stick.is_empty():
 				var f := K.farg(motor.stick[0][1])
 				under += " Du måste bekänna %s." % K.FARG_NAMN[f] if K.farg(tillatna[0]) == f else " Du saknar %s och får spela vad du vill." % K.FARG_NAMN[f]
-			if motor.stick_nr == 5:
+			if _ar_plump():
+				under += " Ditt bud: %d, tagna stick: %d." % [int(motor.bud[p]), hogar[p]]
+			elif motor.stick_nr == 5:
 				under += " Sista sticket ger %d poäng%s." % [regler.stick_poang, (", ut på en tvåa %d" % regler.tvaa_poang) if regler.tvaa_bonus else ""]
 			ui.visa_atgard(info, under, [])
 			inmatning = "spela"
@@ -833,7 +883,7 @@ func _fran_lek(c: int) -> void:
 
 
 func _tavla() -> void:
-	if motor != null and "chicago_tagen" in motor:
+	if motor != null and "chicago_tagen" in motor and not _ar_plump():
 		for i in mini(n, brickor.size()):
 			var tagen: bool = i < motor.chicago_tagen.size() and motor.chicago_tagen[i]
 			var behover: bool = regler.chicago_kravs_for_vinst and regler.chicago_tillatet and i < vis_poang.size() and vis_poang[i] >= regler.malpoang and not tagen
@@ -842,8 +892,11 @@ func _tavla() -> void:
 			elif brickor[i] == "behöver Chicago":
 				brickor[i] = "Chicago tagen" if tagen else ""
 	var tur := -1
-	if motor and (motor.fas == Motor.Fas.BYTE or motor.fas == Motor.Fas.STICK):
+	if motor and (motor.fas == Motor.Fas.BYTE or motor.fas == Motor.Fas.STICK or motor.fas == Motor.Fas.BUD):
 		tur = motor.tur
+	if _ar_plump():
+		for i in mini(n, bytes_info.size()):
+			bytes_info[i] = _plump_info(i)
 	ui.uppdatera_tavla(vis_poang, tur, vis_givare, bytes_info, brickor)
 	_uppdatera_etiketter()
 
@@ -1551,7 +1604,11 @@ func _handelse(e: Dictionary, id: int) -> void:
 	match e.typ:
 		"parti_start":
 			vis_givare = e.givare
-			ui.logga("Partiet börjar. Först till %d poäng." % regler.malpoang, UI.GULD)
+			if _ar_plump():
+				var rd: Array = e.get("rundor", [])
+				ui.logga("Plump börjar: %d givar, %s kort." % [rd.size(), "–".join(rd.slice(0, mini(rd.size(), 3)).map(func(x): return str(x))) + (" …" if rd.size() > 3 else "")], UI.GULD)
+			else:
+				ui.logga("Partiet börjar. Först till %d poäng." % regler.malpoang, UI.GULD)
 			_tavla()
 		"blanda":
 			vis_givare = e.givare
@@ -1565,8 +1622,13 @@ func _handelse(e: Dictionary, id: int) -> void:
 			var gt := Transform3D(Basis(Vector3.UP, _vinkel(e.givare)), _d(e.givare) * 3.55 - _t(e.givare) * 0.2)
 			var tw := create_tween()
 			tw.tween_property(givarknapp, "transform", gt, 0.6 * tf).set_trans(Tween.TRANS_CUBIC)
-			ui.satt_fas("Giv %d · %s blandar" % [e.giv, spelare[e.givare].namn])
-			ui.logga("Giv %d: %s blandar och ger." % [e.giv, spelare[e.givare].namn])
+			if _ar_plump():
+				var antal_givar: int = motor.rundor.size() if "rundor" in motor else 0
+				ui.satt_fas("Giv %d av %d · %d kort · %s ger" % [e.giv, antal_givar, int(e.get("kort", 0)), spelare[e.givare].namn])
+				ui.logga("Giv %d: %d kort, %s ger." % [e.giv, int(e.get("kort", 0)), spelare[e.givare].namn])
+			else:
+				ui.satt_fas("Giv %d · %s blandar" % [e.giv, spelare[e.givare].namn])
+				ui.logga("Giv %d: %s blandar och ger." % [e.giv, spelare[e.givare].namn])
 			_tavla()
 			await _blanda_anim(e.givare, id)
 		"giv":
@@ -1620,6 +1682,18 @@ func _handelse(e: Dictionary, id: int) -> void:
 			ui.visa_banner("Lika händer", "Ingen får poäng", UI.KRAM, 1.2)
 			ui.logga("Lika händer mellan %s: ingen poäng." % ", ".join(namnen))
 			await _vanta(1.6)
+		"bud_start":
+			ui.satt_fas("Bud · %d %s · %s börjar" % [int(e.kort), "kort", spelare[e.spelare].namn])
+			_tavla()
+		"bud":
+			var p: int = e.spelare
+			_popup(p, "Bud %d" % e.bud, UI.SPELARFARG[p])
+			ui.logga("%s bjuder %d." % [spelare[p].namn, e.bud])
+			_gest(p)
+			_tavla()
+			await _vanta(0.7)
+		"plump_resultat":
+			await _plump_resultat(e, id)
 		"chicago_fraga":
 			# vem som får ropa är hemligt: ingen markering av tur under frågan
 			tur_ring.visible = false
@@ -1673,7 +1747,7 @@ func _handelse(e: Dictionary, id: int) -> void:
 			if e.nr == 1:
 				for i in n:
 					bytes_info[i] = ""
-			var t := "Stick %d av 5" % e.nr
+			var t := "Stick %d av %d" % [e.nr, int(e.get("av", 5))]
 			if motor.chicago >= 0 and not motor.chicago_sprack:
 				t += " · Chicago: %s" % spelare[motor.chicago].namn
 			ui.satt_fas(t)
@@ -1706,6 +1780,37 @@ func _handelse(e: Dictionary, id: int) -> void:
 			ui.visa_banner("%s vinner!" % spelare[e.spelare].namn, "%d poäng" % e.poang[e.spelare], UI.GULD, 2.5)
 			ui.logga("%s vinner partiet med %d poäng!" % [spelare[e.spelare].namn, e.poang[e.spelare]], UI.GULD)
 			await _vanta(3.0)
+
+
+## Plump: vem som klarade sitt bud (10 + budet) och vem som fick en plump.
+func _plump_resultat(e: Dictionary, id: int) -> void:
+	var klarade: Array = []
+	var missade: Array = []
+	vis_poang = e.poang.duplicate()
+	for p in n:
+		if e.lyckad[p]:
+			klarade.append(spelare[p].namn)
+			_popup(p, "+%d" % e.fick[p], UI.SPELARFARG[p])
+			if p < gubbar.size():
+				gubbar[p].jubel(false)
+			ui.logga("%s bjöd %d och tog %d: +%d." % [spelare[p].namn, e.bud[p], e.stick[p], e.fick[p]], UI.SPELARFARG[p])
+		else:
+			missade.append(spelare[p].namn)
+			_popup(p, "Plump", Color(1.0, 0.45, 0.4))
+			if p < gubbar.size():
+				gubbar[p].ledsen()
+			ui.logga("%s bjöd %d men tog %d: plump." % [spelare[p].namn, e.bud[p], e.stick[p]], Color(1.0, 0.5, 0.45))
+	ljud.spela("poang" if not klarade.is_empty() else "sprack", 1.0, -2.0, 0.0)
+	var under := ""
+	if not klarade.is_empty():
+		under = "Klarade: " + ", ".join(klarade)
+	if not missade.is_empty():
+		under += ("  ·  " if under != "" else "") + "Plump: " + ", ".join(missade)
+	ui.visa_banner("Givens poäng", under, UI.GULD, 2.2)
+	_tavla()
+	await _vanta(2.6)
+	if id != korning:
+		return
 
 
 func _blanda_anim(g: int, id: int) -> void:
@@ -1914,10 +2019,11 @@ func _stick_anim(e: Dictionary, id: int) -> void:
 	if id != korning:
 		return
 	kort[e.kort].satt_glod(true, Color(1.0, 0.82, 0.3), 1.3)
+	var av: int = int(e.get("av", 5))
 	ui.logga("%s tar stick %d med %s." % [spelare[w].namn, e.nr, K.namn(e.kort)])
-	if e.nr < 5:
+	if e.nr < av:
 		_popup(w, "Sticket", UI.SPELARFARG[w])
-	await _vanta(1.2 if e.nr == 5 else 0.75)
+	await _vanta(1.2 if e.nr == av else 0.75)
 	if id != korning:
 		return
 	_rensa_stick()
@@ -1929,7 +2035,9 @@ func _stick_anim(e: Dictionary, id: int) -> void:
 		k += 1
 	stick_vis = []
 	ljud.spela("glid", 0.9)
-	if motor.fas == Motor.Fas.STICK or e.nr < 5:
+	if _ar_plump():
+		pass  # _tavla skriver bud och stick
+	elif motor.fas == Motor.Fas.STICK or e.nr < 5:
 		bytes_info[w] = "%d stick" % hogar[w]
 	_tavla()
 	await _vanta(0.4)
@@ -2162,7 +2270,7 @@ func _kor_online(id: int) -> void:
 			await _tur(id)
 			vantar_pa_drag = false
 			continue
-		if (fjarr.fas == Motor.Fas.BYTE or fjarr.fas == Motor.Fas.STICK) and fjarr.tur != senast_tur:
+		if (fjarr.fas == Motor.Fas.BYTE or fjarr.fas == Motor.Fas.STICK or fjarr.fas == Motor.Fas.BUD) and fjarr.tur != senast_tur:
 			senast_tur = fjarr.tur
 			_visa_tur(fjarr.tur)
 		await nat_nytt

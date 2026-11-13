@@ -2,7 +2,7 @@ extends SceneTree
 ## Skärmbilder av bordet mitt i ett parti, för att jämföra grafiken (Theo 2026-11-12).
 ## Fyra spelare mot en lokal server: Theo i spelet och tre enkla klienter (testspelarens logik).
 ##
-##   Godot --path . --script res://verktyg/bordfoto.gd -- ut_katalog [prefix]
+##   Godot --path . --script res://verktyg/bordfoto.gd -- ut_katalog [prefix] [plump]
 ##   Godot --path . --rendering-method gl_compatibility --script res://verktyg/bordfoto.gd -- ut_katalog webb
 ##
 ## Bilder: <prefix>_byte.png (egen hand vid bytet) och <prefix>_stick.png (kort i sticket).
@@ -88,6 +88,10 @@ func _init() -> void:
 		await process_frame
 	main.server_url_tvingad = "ws://127.0.0.1:%d" % PORT
 	var r := Regler.new()
+	var plump := args.size() > 2 and args[2] == "plump"
+	if plump:
+		r.spel = 1
+	var tagit_bud := false
 	var gaster: Array = []
 	var namn := ["Anna", "Lukas", "Adam"]
 	var figur := [0, 2, 3]
@@ -130,6 +134,13 @@ func _init() -> void:
 					main.beslut.emit(false)
 				"chicago":
 					main.beslut.emit(false)
+				"bud":
+					if not tagit_bud:
+						tagit_bud = true
+						await _vanta(1.0)
+						await _spara(katalog, prefix + "_bud.png")
+					var tb: Array = main.motor.tillatna_bud(main.min_plats)
+					main.beslut.emit(tb[0])
 				"spela":
 					if main.stick_vis.size() >= 2:
 						await _vanta(1.2)

@@ -46,7 +46,14 @@ func _process(_dt: float) -> void:
 		Motor.Fas.CHICAGO:
 			k.skicka({"t": "chicago", "ja": Robot.valj_chicago(vy, Robot.MEDEL, rng)})
 		Motor.Fas.STICK:
-			k.skicka({"t": "spela", "kort": Robot.valj_kort(vy, Robot.MEDEL, rng)})
+			if r.ar_plump():
+				var t: Array = vy.tillatna
+				k.skicka({"t": "spela", "kort": t[rng.randi() % t.size()]})
+			else:
+				k.skicka({"t": "spela", "kort": Robot.valj_kort(vy, Robot.MEDEL, rng)})
+		Motor.Fas.BUD:
+			var tb: Array = vy.tillatna_bud
+			k.skicka({"t": "bud", "bud": tb[rng.randi() % tb.size()]})
 		_:
 			return
 	skickat = true
