@@ -328,7 +328,7 @@ func _bygg_huvudmeny() -> void:
 	v.offset_right = 700
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 8 if mobil else 14)
-	var titel := _lbl("Chicago", 96 if mobil else 150, true, GULD)
+	var titel := _lbl("Spela kort", 96 if mobil else 150, true, GULD)
 	titel.add_theme_constant_override("shadow_offset_x", 0)
 	titel.add_theme_constant_override("shadow_offset_y", 6)
 	titel.add_theme_constant_override("shadow_outline_size", 18)
