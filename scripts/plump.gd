@@ -51,12 +51,15 @@ var upp_slangt := -1
 
 
 ## Antal kort i varje giv: max ner till 1, och upp igen om regeln säger det. Max begränsas av leken.
+## Med 1 kort spelas en giv per spelare, så att alla hinner vara givare innan det går upp igen.
 static func rundlista(antal_spelare: int, max_kort: int, upp_igen: bool) -> Array:
 	var m := mini(max_kort, 52 / antal_spelare)
 	m = maxi(m, 1)
 	var a: Array = []
-	for k in range(m, 0, -1):
+	for k in range(m, 1, -1):
 		a.append(k)
+	for i in maxi(antal_spelare, 1):
+		a.append(1)
 	if upp_igen:
 		for k in range(2, m + 1):
 			a.append(k)

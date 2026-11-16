@@ -31,11 +31,11 @@ func _init() -> void:
 
 
 func _rundor() -> void:
-	_ok(Plump.rundlista(4, 10, true) == [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "4 spelare 10 ner och upp")
-	_ok(Plump.rundlista(4, 10, false) == [10, 9, 8, 7, 6, 5, 4, 3, 2, 1], "bara ner")
+	_ok(Plump.rundlista(4, 10, true) == [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "4 spelare 10 ner och upp, 1 kort en gång per givare")
+	_ok(Plump.rundlista(4, 10, false) == [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 1, 1, 1], "bara ner")
 	_ok(Plump.rundlista(6, 10, true)[0] == 8, "6 spelare börjar på 8 (52/6)")
 	_ok(Plump.rundlista(5, 10, true)[0] == 10, "5 spelare räcker till 10")
-	_ok(Plump.rundlista(3, 3, true) == [3, 2, 1, 2, 3], "3 kort")
+	_ok(Plump.rundlista(3, 3, true) == [3, 2, 1, 1, 1, 2, 3], "3 kort")
 
 
 func _regler(max_kort := 10, upp := true):
